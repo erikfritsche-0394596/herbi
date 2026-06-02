@@ -189,9 +189,9 @@ Screens.recipe = function(el, params) {
       if (portions < 8) { portions++; render(); }
     });
 
-    // Einkaufsliste
+    // Einkaufsliste – nur Zutaten dieses Gerichts
     el.querySelector('#list-btn').addEventListener('click', () => {
-      Router.navigate('list', { weekKey });
+      Router.navigate('list', { weekKey, fromMeal: { day, type } });
     });
 
     // Gekocht markieren
