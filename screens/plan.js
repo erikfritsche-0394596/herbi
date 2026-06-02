@@ -466,19 +466,41 @@ Screens.plan = function(el, params) {
     const container = el.querySelector('#day-content') || el;
 
     // Loading anzeigen
+    let cancelled = false;
     if (container) {
       container.innerHTML = `
-        <div class="loading-screen" style="min-height:300px">
+        <div class="loading-screen" style="min-height:300px;gap:16px">
+          <div style="font-size:40px">🌿</div>
           <div class="spinner"></div>
-          <div class="loading-text">Plan wird erstellt…</div>
+          <div class="loading-text" id="gen-msg">Plan wird erstellt…</div>
+          <div style="font-size:12px;color:var(--text-3);text-align:center;line-height:1.6" id="gen-sub">KI wählt Rezepte für dich aus…</div>
+          <button id="cancel-plan-btn" style="margin-top:8px;padding:9px 22px;border-radius:10px;background:transparent;color:var(--text-3);font-size:13px;font-weight:500;border:1px solid var(--border-mid);cursor:pointer">
+            Abbrechen
+          </button>
         </div>
       `;
+
+      const subTexts = ['KI wählt Rezepte für dich aus…', 'Budget wird berechnet…', 'Meal Prep wird geplant…', 'Fast fertig…'];
+      let subIdx = 0;
+      const subInterval = setInterval(() => {
+        subIdx = (subIdx + 1) % subTexts.length;
+        const subEl = container.querySelector('#gen-sub');
+        if (subEl) subEl.textContent = subTexts[subIdx];
+      }, 2000);
+
+      container.querySelector('#cancel-plan-btn')?.addEventListener('click', () => {
+        cancelled = true;
+        clearInterval(subInterval);
+        render(); // Zurück zur normalen Ansicht
+      });
     }
 
     try {
       const apiKey   = localStorage.getItem('herbi_api_key');
       const settings = Store.getSettings();
       const planData = await API.generateWeekPlan(settings, apiKey);
+
+      if (cancelled) return; // Nutzer hat abgebrochen
 
       Store.savePlan(key, {
         meals:        planData.days,
