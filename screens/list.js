@@ -3,8 +3,14 @@
 // ============================================
 
 Screens.list = function(el, params) {
-  const { weekKey } = params || {};
+  const { weekKey, selectedMeals, fromMeal } = params || {};
   const key = weekKey || Store.getCurrentWeekKey();
+  // selectedMeals = Set/Array von "Mo-lunch", "Di-dinner" etc. (aus Wochenplan-Auswahl)
+  // fromMeal = { day, type } wenn direkt aus Rezept geöffnet
+  const mealFilter = fromMeal
+    ? new Set([`${fromMeal.day}-${fromMeal.type}`])
+    : (selectedMeals && selectedMeals.length > 0 ? new Set(selectedMeals) : null);
+  // null = keine Filterung = alle Mahlzeiten
 
   const plan = Store.getPlan(key);
   if (!plan) {
@@ -53,6 +59,8 @@ Screens.list = function(el, params) {
       ['breakfast','lunch','dinner'].forEach(type => {
         const meal = plan.meals?.[day]?.[type];
         if (!meal || meal.is_rest) return;
+        // Filter: wenn mealFilter gesetzt, nur ausgewählte Mahlzeiten
+        if (mealFilter && !mealFilter.has(`${day}-${type}`)) return;
 
         (meal.ingredients || []).forEach(ing => {
           const key = ing.name.toLowerCase().trim().replace(/\s+/g,'-');
@@ -154,6 +162,22 @@ Screens.list = function(el, params) {
             <span class="list-prog-pct">${p} %</span>
           </div>
 
+          <!-- Filter Reset -->
+          ${mealFilter ? `
+          <div style="display:flex;align-items:center;gap:8px;padding:6px 0 8px">
+            <div style="flex:1;font-size:12px;color:var(--text-2)">
+              ${[...mealFilter].map(id => {
+                const [d,t] = id.split('-');
+                const tl = {breakfast:'Frühstück',lunch:'Mittag',dinner:'Abend'};
+                return d + ' ' + (tl[t]||t);
+              }).join(', ')}
+            </div>
+            <button id="clear-filter-btn" style="font-size:11px;font-weight:600;color:var(--green);background:transparent;border:none;cursor:pointer;padding:4px 0;white-space:nowrap">
+              Alle anzeigen ✕
+            </button>
+          </div>
+          ` : ''}
+
           <!-- Cat Tabs -->
           <div class="cat-tabs-wrap">
             <div class="cat-tab${activeFilter === 'alle' ? ' active' : ''}" data-cat="alle">🛒 Alle</div>
@@ -187,6 +211,11 @@ Screens.list = function(el, params) {
     el.querySelector('#back-btn').addEventListener('click', () => goBack());
     el.querySelector('#share-btn').addEventListener('click', () => {
       Router.navigate('share', { weekKey: key, items: allItems });
+    });
+
+    // Filter zurücksetzen → alle Mahlzeiten anzeigen
+    el.querySelector('#clear-filter-btn')?.addEventListener('click', () => {
+      Router.navigate('list', { weekKey: key }); // ohne Filter
     });
 
     el.querySelectorAll('[data-cat]').forEach(tab => {
