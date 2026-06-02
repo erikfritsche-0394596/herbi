@@ -62,7 +62,9 @@ Screens.apiKey = function(el, params) {
     const key = input.value.trim();
     if (!key) return;
     localStorage.setItem('herbi_api_key', key);
-    Router.navigate('onboarding-markets');
+    // Direkt zu Einstellungen – Nutzer konfiguriert selbst
+    Store.completeOnboarding();
+    Router.navigate('settings');
   });
 };
 
