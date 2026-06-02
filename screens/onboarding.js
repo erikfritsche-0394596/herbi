@@ -533,14 +533,25 @@ Screens['plan-generating'] = async function(el, params) {
   ];
   let msgIdx = 0;
 
+  let cancelled = false;
+
   el.innerHTML = `
     <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;padding:40px">
       <div style="font-size:56px">🌿</div>
       <div class="spinner"></div>
       <div style="font-size:16px;font-weight:600;color:var(--text);text-align:center" id="loading-msg">${msgs[0]}</div>
       <div style="font-size:13px;color:var(--text-2);text-align:center;line-height:1.5">KI erstellt deinen<br>persönlichen Wochenplan…</div>
+      <button id="cancel-gen-btn" style="margin-top:12px;padding:10px 24px;border-radius:12px;background:transparent;color:#9a9a94;font-size:13px;font-weight:500;border:1px solid #ddd;cursor:pointer">
+        Abbrechen
+      </button>
     </div>
   `;
+
+  el.querySelector('#cancel-gen-btn').addEventListener('click', () => {
+    cancelled = true;
+    clearInterval(interval);
+    Router.navigate('onboarding-cuisine');
+  });
 
   const msgEl    = el.querySelector('#loading-msg');
   const interval = setInterval(() => {
@@ -556,13 +567,15 @@ Screens['plan-generating'] = async function(el, params) {
     const weekKey  = Store.getCurrentWeekKey();
     const planData = await API.generateWeekPlan(settings, apiKey);
 
+    clearInterval(interval);
+    if (cancelled) return; // Nutzer hat abgebrochen
+
     Store.savePlan(weekKey, {
       meals:        planData.days,
       total_cost:   planData.total_cost,
       generated_at: new Date().toISOString(),
     });
 
-    clearInterval(interval);
     Router.navigate('plan', {}, { replace: true });
 
   } catch (err) {
