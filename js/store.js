@@ -176,6 +176,94 @@ const Store = (() => {
     return Object.keys(state.plans || {}).sort();
   }
 
+
+  // ============================================
+  // VORRAT (Pantry) Funktionen
+  // ============================================
+
+  // Vorrats-Item speichern
+  // item = { key, name, emoji, amount, unit, category, addedAt, isFresh }
+  function savePantryItem(item) {
+    if (!state.pantry) state.pantry = {};
+    state.pantry[item.key] = {
+      ...item,
+      addedAt: item.addedAt || new Date().toISOString(),
+    };
+    save();
+  }
+
+  // Mehrere Vorrats-Items auf einmal speichern
+  function savePantryItems(items) {
+    if (!state.pantry) state.pantry = {};
+    items.forEach(item => {
+      if (item.surplusAmount > 0) {
+        const key = item.name.toLowerCase().trim().replace(/\s+/g, '-');
+        const existing = state.pantry[key];
+        state.pantry[key] = {
+          key,
+          name:      item.name,
+          emoji:     item.emoji || '🥡',
+          amount:    (existing?.amount || 0) + item.surplusAmount,
+          unit:      item.unit,
+          category:  item.category || 'sonstiges',
+          isFresh:   item.isFresh || false,
+          addedAt:   new Date().toISOString(),
+        };
+      }
+    });
+    save();
+  }
+
+  // Vorrats-Item aktualisieren (z.B. Menge reduzieren nach dem Kochen)
+  function updatePantryItem(key, updates) {
+    if (!state.pantry?.[key]) return;
+    state.pantry[key] = { ...state.pantry[key], ...updates };
+    if (state.pantry[key].amount <= 0) {
+      delete state.pantry[key];
+    }
+    save();
+  }
+
+  // Vorrats-Item löschen
+  function removePantryItem(key) {
+    if (state.pantry?.[key]) {
+      delete state.pantry[key];
+      save();
+    }
+  }
+
+  // Alle Vorrats-Items laden
+  function getPantry() {
+    return state.pantry || {};
+  }
+
+  // Vorrat nach einer Mahlzeit reduzieren
+  function deductPantryForMeal(ingredients) {
+    if (!state.pantry) return;
+    ingredients.forEach(ing => {
+      const key = ing.name.toLowerCase().trim().replace(/\s+/g, '-');
+      if (state.pantry[key]) {
+        state.pantry[key].amount -= ing.amount;
+        if (state.pantry[key].amount <= 0) {
+          delete state.pantry[key];
+        }
+      }
+    });
+    save();
+  }
+
+  // Einkaufsliste: Surplus-Mengen speichern
+  // surplusData = { itemKey: { bought, needed, unit, name, emoji, isFresh } }
+  function saveSurplusData(weekKey, surplusData) {
+    if (!state.surplusData) state.surplusData = {};
+    state.surplusData[weekKey] = surplusData;
+    save();
+  }
+
+  function getSurplusData(weekKey) {
+    return state.surplusData?.[weekKey] || {};
+  }
+
   // Initialisieren
   load();
 
@@ -196,6 +284,14 @@ const Store = (() => {
     getCurrentWeekKey,
     weekKeyToDates,
     save,
+    savePantryItem,
+    savePantryItems,
+    updatePantryItem,
+    removePantryItem,
+    getPantry,
+    deductPantryForMeal,
+    saveSurplusData,
+    getSurplusData,
     // Für Debugging
     _state: () => state,
   };
