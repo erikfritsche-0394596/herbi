@@ -201,13 +201,12 @@ const Store = (() => {
         const existing = state.pantry[key];
         state.pantry[key] = {
           key,
-          name:      item.name,
-          emoji:     item.emoji || '🥡',
-          amount:    (existing?.amount || 0) + item.surplusAmount,
-          unit:      item.unit,
-          category:  item.category || 'sonstiges',
-          isFresh:   item.isFresh || false,
-          addedAt:   new Date().toISOString(),
+          name:            item.name,
+          emoji:           item.emoji || '🥡',
+          amount:          (existing?.amount || 0) + item.surplusAmount,
+          unit:            item.unit,
+          storageCategory: item.storageCategory || 'trocken',
+          addedAt:         new Date().toISOString(),
         };
       }
     });
