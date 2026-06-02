@@ -6,14 +6,12 @@
 
 const API = (() => {
 
-  // API Key wird aus config.js geladen (nicht im Repo!)
-  const CLAUDE_API_KEY = typeof CONFIG !== 'undefined' ? CONFIG.CLAUDE_API_KEY : '';
 
   // ============================================
   // CLAUDE API – Wochenplan generieren
   // ============================================
 
-  async function generateWeekPlan(settings) {
+  async function generateWeekPlan(settings, apiKey) {
     const {
       supermarkets, budget, portions, meals,
       cuisines, mealConfig, diets, avoids
@@ -93,7 +91,7 @@ Antworte NUR mit einem JSON-Objekt (kein Markdown, keine Erklärung):
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
+          'x-api-key': apiKey || '',
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
@@ -126,7 +124,7 @@ Antworte NUR mit einem JSON-Objekt (kein Markdown, keine Erklärung):
   // CLAUDE API – Alternative Rezepte vorschlagen
   // ============================================
 
-  async function suggestAlternatives(currentMeal, settings, count = 5) {
+  async function suggestAlternatives(currentMeal, settings, apiKey, count = 5) {
     const prompt = `Schlage ${count} alternative Rezepte für ein "${currentMeal.name}" vor.
 
 Bedingungen:
@@ -154,7 +152,7 @@ Antworte NUR mit einem JSON-Array:
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': CLAUDE_API_KEY,
+          'x-api-key': apiKey || '',
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
