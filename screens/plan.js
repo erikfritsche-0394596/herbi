@@ -651,11 +651,11 @@ Screens.settings = function(el, params) {
   `;
 
   // Edit settings → back to onboarding
-  el.querySelector('#row-markets').addEventListener('click',  () => Router.navigate('onboarding-markets'));
-  el.querySelector('#row-budget').addEventListener('click',   () => Router.navigate('onboarding-budget'));
-  el.querySelector('#row-portions').addEventListener('click', () => Router.navigate('onboarding-budget'));
-  el.querySelector('#row-cuisines').addEventListener('click', () => Router.navigate('onboarding-cuisine'));
-  el.querySelector('#row-diets').addEventListener('click',    () => Router.navigate('onboarding-cuisine'));
+  el.querySelector('#row-markets').addEventListener('click',  () => Router.navigate('onboarding-markets', { fromSettings: true }));
+  el.querySelector('#row-budget').addEventListener('click',   () => Router.navigate('onboarding-budget',  { fromSettings: true }));
+  el.querySelector('#row-portions').addEventListener('click', () => Router.navigate('onboarding-budget',  { fromSettings: true }));
+  el.querySelector('#row-cuisines').addEventListener('click', () => Router.navigate('onboarding-cuisine', { fromSettings: true }));
+  el.querySelector('#row-diets').addEventListener('click',    () => Router.navigate('onboarding-cuisine', { fromSettings: true }));
 
   el.querySelector('#row-apikey').addEventListener('click', () => {
     const key = prompt('Neuen Claude API Key eingeben:');
