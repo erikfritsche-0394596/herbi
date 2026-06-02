@@ -101,6 +101,34 @@ Screens.list = function(el, params) {
   const allItems    = buildShoppingList();
   let activeFilter  = 'alle';
 
+  // Surplus-Tracking: wie viel hat der User gekauft?
+  const savedSurplus = Store.getSurplusData(key) || {};
+  const boughtAmounts = {}; // itemKey → { bought, unit }
+  // Mit gespeicherten Werten initialisieren
+  Object.keys(savedSurplus).forEach(k => {
+    boughtAmounts[k] = savedSurplus[k];
+  });
+  // Default: exakt die benötigte Menge
+  allItems.forEach(item => {
+    if (!boughtAmounts[item.key]) {
+      boughtAmounts[item.key] = { bought: item.amount, unit: item.unit, name: item.name, emoji: item.emoji || '🛒', isFresh: guessFresh(item) };
+    }
+  });
+
+  function guessFresh(item) {
+    const n = item.name.toLowerCase();
+    return /ei|eier|fleisch|fisch|lachs|garnelen|tofu|milch|joghurt|quark|ricotta|mozzarella|brokkoli|spinat|salat|tomate|gurke|avocado|karotte|paprika|zucchini/.test(n);
+  }
+
+  function getSurplus(item) {
+    const b = boughtAmounts[item.key]?.bought || item.amount;
+    return Math.max(0, b - item.amount);
+  }
+
+  function hasSurplus() {
+    return allItems.some(item => getSurplus(item) > 0);
+  }
+
   function isChecked(itemKey) {
     return Store.isItemChecked(key, itemKey);
   }
@@ -198,11 +226,15 @@ Screens.list = function(el, params) {
         <div class="bottom-bar">
           <button class="action-btn" id="check-all-btn">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20,6 9,17 4,12"/></svg>
-            ${done === allItems.length ? 'Alle zurücksetzen' : 'Alle abhaken'}
+            ${done === allItems.length ? 'Zurücksetzen' : 'Alle abhaken'}
           </button>
+          ${hasSurplus() ? `
+          <button class="action-btn" id="pantry-btn" style="background:#F97B22;color:#fff;border-color:#F97B22">
+            📦 Vorrat speichern
+          </button>` : `
           <button class="action-btn bring" id="bring-btn">
             🛍️ Zu Bring!
-          </button>
+          </button>`}
         </div>
       </div>
     `;
@@ -225,11 +257,60 @@ Screens.list = function(el, params) {
       });
     });
 
-    el.querySelectorAll('[data-item-key]').forEach(row => {
-      row.addEventListener('click', () => {
-        Store.toggleListItem(key, row.dataset.itemKey);
+    // Checkbox click
+    el.querySelectorAll('[data-cb]').forEach(cb => {
+      cb.addEventListener('click', e => {
+        e.stopPropagation();
+        Store.toggleListItem(key, cb.dataset.cb);
         render();
       });
+    });
+
+    // Minus button
+    el.querySelectorAll('[data-minus]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const k = btn.dataset.minus;
+        const item = allItems.find(i => i.key === k);
+        if (!item) return;
+        const step = getStep(item.unit);
+        const minAmt = item.amount; // nie unter benötigte Menge
+        if (!boughtAmounts[k]) boughtAmounts[k] = { bought: item.amount, unit: item.unit, name: item.name };
+        boughtAmounts[k].bought = Math.max(minAmt, boughtAmounts[k].bought - step);
+        // Save to store
+        Store.saveSurplusData(key, boughtAmounts);
+        render();
+      });
+    });
+
+    // Plus button
+    el.querySelectorAll('[data-plus]').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const k = btn.dataset.plus;
+        const item = allItems.find(i => i.key === k);
+        if (!item) return;
+        const step = getStep(item.unit);
+        if (!boughtAmounts[k]) boughtAmounts[k] = { bought: item.amount, unit: item.unit, name: item.name };
+        boughtAmounts[k].bought += step;
+        Store.saveSurplusData(key, boughtAmounts);
+        render();
+      });
+    });
+
+    // Vorrat speichern
+    el.querySelector('#pantry-btn')?.addEventListener('click', () => {
+      const surplusItems = allItems
+        .filter(item => getSurplus(item) > 0)
+        .map(item => ({
+          ...item,
+          surplusAmount: getSurplus(item),
+          isFresh: guessFresh(item),
+          emoji: item.emoji || '🥡',
+        }));
+      Store.savePantryItems(surplusItems);
+      // Navigate to pantry tab
+      navigate('pantry');
     });
 
     el.querySelector('#check-all-btn').addEventListener('click', () => {
@@ -274,19 +355,46 @@ Screens.list = function(el, params) {
   }
 
   function renderItem(item) {
-    const done = isChecked(item.key);
+    const done    = isChecked(item.key);
+    const bought  = boughtAmounts[item.key]?.bought ?? item.amount;
+    const surplus = Math.max(0, bought - item.amount);
+    const surplusStr = surplus > 0
+      ? formatAmt(surplus, item.unit) + ' übrig'
+      : 'exakt';
+    const surplusColor = surplus > 0 ? '#F97B22' : '#9a9a94';
+
     return `
-      <div class="list-item${done ? ' done' : ''}" data-item-key="${item.key}">
-        <div class="list-item-cb${done ? ' on' : ''}">
-          ${done ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg>' : ''}
+      <div class="list-item${done ? ' done' : ''}" data-item-key="${item.key}" style="flex-direction:column;align-items:stretch;gap:4px;padding:8px 0">
+        <div style="display:flex;align-items:center;gap:9px">
+          <div class="list-item-cb${done ? ' on' : ''}" style="flex-shrink:0" data-cb="${item.key}">
+            ${done ? '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg>' : ''}
+          </div>
+          <div class="list-item-info">
+            <div class="list-item-name">${item.name}</div>
+            <div class="list-item-for">Brauche: ${item.amtStr}</div>
+          </div>
         </div>
-        <div class="list-item-info">
-          <div class="list-item-name">${item.name}</div>
-          <div class="list-item-for">${item.forStr}</div>
+        <div style="display:flex;align-items:center;gap:8px;padding-left:29px">
+          <span style="font-size:11px;color:var(--color-text-secondary)">Kaufe:</span>
+          <button data-minus="${item.key}" style="width:20px;height:20px;border-radius:50%;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--color-text-secondary);line-height:1;flex-shrink:0">−</button>
+          <span data-bought-val="${item.key}" style="font-size:12px;font-weight:500;color:var(--color-text-primary);min-width:40px;text-align:center">${formatAmt(bought, item.unit)}</span>
+          <button data-plus="${item.key}" style="width:20px;height:20px;border-radius:50%;border:0.5px solid var(--color-border-secondary);background:var(--color-background-secondary);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--color-text-secondary);line-height:1;flex-shrink:0">+</button>
+          <span style="font-size:10px;font-weight:500;color:${surplusColor}" data-surplus-lbl="${item.key}">${surplusStr}</span>
         </div>
-        <span class="list-item-amt">${item.amtStr}</span>
       </div>
     `;
+  }
+
+  function formatAmt(amount, unit) {
+    if (!unit) return String(Math.round(amount));
+    if (unit === 'g' && amount >= 1000) return (amount/1000).toFixed(amount%1000===0?0:1) + ' kg';
+    if (unit === 'ml' && amount >= 1000) return (amount/1000).toFixed(1) + ' l';
+    return (Number.isInteger(amount) ? amount : parseFloat(amount.toFixed(1))) + ' ' + unit;
+  }
+
+  function getStep(unit) {
+    if (unit === 'g' || unit === 'ml') return 50;
+    return 1;
   }
 
   render();
