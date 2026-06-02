@@ -117,15 +117,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Ersten Screen bestimmen
   const hasApiKey = !!localStorage.getItem('herbi_api_key');
+  const hasPlan   = !!Store.getPlan(Store.getCurrentWeekKey());
 
   if (!hasApiKey) {
     // Kein Key → einmaliger Key-Screen
     Router.navigate('apiKey', {}, { replace: true });
-  } else if (Store.isOnboardingDone()) {
-    // Alles vorhanden → direkt zum Plan
+  } else if (hasPlan) {
+    // Plan vorhanden → direkt zum Wochenplan
     Router.navigate('plan', {}, { replace: true });
   } else {
-    // Key da aber Onboarding noch nicht abgeschlossen
-    Router.navigate('onboarding-markets', {}, { replace: true });
+    // Key da aber noch kein Plan → Einstellungen
+    Router.navigate('settings', {}, { replace: true });
   }
 });
