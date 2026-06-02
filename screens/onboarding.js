@@ -70,6 +70,7 @@ Screens.apiKey = function(el, params) {
 // SCREEN 1 – SUPERMARKT AUSWAHL
 // ============================================
 Screens.onboardingMarkets = function(el, params) {
+  const fromSettings = params?.fromSettings || false;
   const markets = [
     { id:'rewe',   logo:'R', color:'#CC0000', tcolor:'#fff',    name:'Rewe',    desc:'Täglicher Einkauf'        },
     { id:'edeka',  logo:'E', color:'#F5A800', tcolor:'#003087', name:'Edeka',   desc:'Qualität & Vielfalt'      },
@@ -86,7 +87,7 @@ Screens.onboardingMarkets = function(el, params) {
       <div class="onboarding-screen">
         <div class="status-spacer"></div>
         <div class="onboarding-progress">
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 1 von 4</div>
+          ${fromSettings ? `<button onclick="goBack()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px">← Abbrechen</button>` : `<div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 1 von 4</div>`}
           <div class="progress-track"><div class="progress-fill" style="width:25%"></div></div>
         </div>
         <div class="onboarding-body">
@@ -127,7 +128,11 @@ Screens.onboardingMarkets = function(el, params) {
     contBtn.disabled = selected.size === 0;
     contBtn.addEventListener('click', () => {
       Store.updateSettings({ supermarkets: [...selected] });
-      Router.navigate('onboarding-budget');
+      if (fromSettings) {
+        Router.navigate('settings');
+      } else {
+        Router.navigate('onboarding-budget');
+      }
     });
   }
 
@@ -138,6 +143,7 @@ Screens.onboardingMarkets = function(el, params) {
 // SCREEN 2 – BUDGET, MAHLZEITEN, PERSONEN
 // ============================================
 Screens.onboardingBudget = function(el, params) {
+  const fromSettings = params?.fromSettings || false;
   const s = Store.getSettings();
   let budget   = s.budget   || 70;
   let portions = s.portions || 1;
@@ -162,7 +168,7 @@ Screens.onboardingBudget = function(el, params) {
       <div class="onboarding-screen">
         <div class="status-spacer"></div>
         <div class="onboarding-progress">
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 2 von 4</div>
+          ${fromSettings ? `<button onclick="goBack()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px">← Abbrechen</button>` : `<div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 2 von 4</div>`}
           <div class="progress-track"><div class="progress-fill" style="width:50%"></div></div>
         </div>
         <div class="onboarding-body">
@@ -223,7 +229,7 @@ Screens.onboardingBudget = function(el, params) {
           </div>
         </div>
         <div class="onboarding-footer">
-          <button class="continue-btn" id="budget-cont">Weiter</button>
+          <button class="continue-btn" id="budget-cont">${fromSettings ? 'Speichern' : 'Weiter'}</button>
         </div>
       </div>
     `;
@@ -270,7 +276,11 @@ Screens.onboardingBudget = function(el, params) {
     // Continue
     el.querySelector('#budget-cont').addEventListener('click', () => {
       Store.updateSettings({ budget, portions, meals });
-      Router.navigate('onboarding-cuisine');
+      if (fromSettings) {
+        Router.navigate('settings');
+      } else {
+        Router.navigate('onboarding-cuisine');
+      }
     });
   }
 
@@ -281,6 +291,7 @@ Screens.onboardingBudget = function(el, params) {
 // SCREEN 3 – KÜCHE & MAHLZEIT-KONFIGURATION
 // ============================================
 Screens.onboardingCuisine = function(el, params) {
+  const fromSettings = params?.fromSettings || false;
   const s = Store.getSettings();
   let selectedCuisines = new Set(s.cuisines || ['italienisch', 'asiatisch']);
   let mealConfig = JSON.parse(JSON.stringify(s.mealConfig || {
@@ -384,7 +395,7 @@ Screens.onboardingCuisine = function(el, params) {
       <div class="onboarding-screen">
         <div class="status-spacer"></div>
         <div class="onboarding-progress">
-          <div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 3 von 4</div>
+          ${fromSettings ? `<button onclick="goBack()" style="background:none;border:none;font-size:13px;color:var(--text-3);cursor:pointer;padding:0 0 10px;display:flex;align-items:center;gap:4px">← Abbrechen</button>` : `<div style="font-size:12px;color:var(--text-3);margin-bottom:8px">Schritt 3 von 4</div>`}
           <div class="progress-track"><div class="progress-fill" style="width:75%"></div></div>
         </div>
         <div class="onboarding-body">
@@ -438,7 +449,7 @@ Screens.onboardingCuisine = function(el, params) {
           </div>
         </div>
         <div class="onboarding-footer">
-          <button class="continue-btn" id="cuisine-cont">Plan erstellen ✨</button>
+          <button class="continue-btn" id="cuisine-cont">${fromSettings ? 'Speichern' : 'Plan erstellen ✨'}</button>
         </div>
       </div>
     `;
@@ -513,8 +524,12 @@ Screens.onboardingCuisine = function(el, params) {
         diets:      [...selectedDiets],
         avoids:     [...selectedAvoids],
       });
-      Store.completeOnboarding();
-      Router.navigate('plan-generating');
+      if (fromSettings) {
+        Router.navigate('settings');
+      } else {
+        Store.completeOnboarding();
+        Router.navigate('plan-generating');
+      }
     });
   }
 
