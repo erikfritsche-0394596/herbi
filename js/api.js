@@ -96,8 +96,8 @@ Antworte NUR mit einem JSON-Objekt (kein Markdown, keine Erklärung):
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 4000,
+          model: 'claude-opus-4-5',
+          max_tokens: 8000,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
@@ -157,8 +157,8 @@ Antworte NUR mit einem JSON-Array:
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-5',
-          max_tokens: 1000,
+          model: 'claude-opus-4-5',
+          max_tokens: 2000,
           messages: [{ role: 'user', content: prompt }],
         }),
       });
