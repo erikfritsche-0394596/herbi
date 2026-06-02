@@ -563,10 +563,21 @@ Screens.plan = function(el, params) {
 // ============================================
 Screens.settings = function(el, params) {
   const s = Store.getSettings();
+  const hasPlan = !!Store.getPlan(Store.getCurrentWeekKey());
 
   const MARKET_NAMES = {
     rewe:'Rewe', edeka:'Edeka', lidl:'Lidl',
-    netto:'Netto', denns:"denn's", goasia:'Go Asia',
+    netto:'Netto', denns:"denn\'s", goasia:'Go Asia',
+  };
+
+  const mealLabels = [];
+  if (s.meals?.breakfast) mealLabels.push('Frühstück');
+  if (s.meals?.lunch)     mealLabels.push('Mittag');
+  if (s.meals?.dinner)    mealLabels.push('Abend');
+
+  const dietLabels = {
+    alles:'Alles', flexitarisch:'Flexitarisch', vegetarisch:'Vegetarisch',
+    vegan:'Vegan', pescetarisch:'Pescetarisch', highprotein:'High-Protein',
   };
 
   el.innerHTML = `
@@ -578,6 +589,16 @@ Screens.settings = function(el, params) {
         </div>
       </div>
 
+      <!-- Plan erstellen Button -->
+      <div style="padding:0 16px 16px">
+        <button id="create-plan-btn" style="width:100%;padding:15px;border-radius:14px;background:${hasPlan ? '#2D7D3A' : '#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+          ${hasPlan ? 'Neuen Plan erstellen' : 'Plan erstellen – Einstellungen zuerst vornehmen'}
+        </button>
+        ${!hasPlan ? '<div style="font-size:11px;color:#9a9a94;text-align:center;margin-top:6px">Bitte erst Einkauf und Küche einstellen ↓</div>' : ''}
+      </div>
+
+      <!-- EINKAUF -->
       <div class="settings-section">
         <div class="settings-section-label">Einkauf</div>
         <div class="settings-group">
@@ -586,45 +607,82 @@ Screens.settings = function(el, params) {
               <span class="settings-row-icon">🛒</span>
               <span class="settings-row-label">Supermärkte</span>
             </div>
-            <span class="settings-row-value">${(s.supermarkets || []).map(id => MARKET_NAMES[id] || id).join(', ')}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${(s.supermarkets || []).map(id => MARKET_NAMES[id] || id).join(', ') || '–'}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
           <div class="settings-row" id="row-budget">
             <div class="settings-row-left">
               <span class="settings-row-icon">💶</span>
               <span class="settings-row-label">Wochenbudget</span>
             </div>
-            <span class="settings-row-value">${s.budget} €</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${s.budget || 70} €</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
           <div class="settings-row" id="row-portions">
             <div class="settings-row-left">
               <span class="settings-row-icon">👤</span>
               <span class="settings-row-label">Personen</span>
             </div>
-            <span class="settings-row-value">${s.portions} ${s.portions === 1 ? 'Person' : 'Personen'}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${s.portions || 1} ${(s.portions || 1) === 1 ? 'Person' : 'Personen'}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
+          </div>
+          <div class="settings-row" id="row-meals">
+            <div class="settings-row-left">
+              <span class="settings-row-icon">🍽️</span>
+              <span class="settings-row-label">Mahlzeiten</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${mealLabels.join(', ') || '–'}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- KÜCHE -->
       <div class="settings-section">
         <div class="settings-section-label">Küche</div>
         <div class="settings-group">
           <div class="settings-row" id="row-cuisines">
             <div class="settings-row-left">
-              <span class="settings-row-icon">🍽️</span>
+              <span class="settings-row-icon">🍝</span>
               <span class="settings-row-label">Lieblingsküchen</span>
             </div>
-            <span class="settings-row-value">${(s.cuisines || []).join(', ')}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${(s.cuisines || []).join(', ') || '–'}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
           <div class="settings-row" id="row-diets">
             <div class="settings-row-left">
               <span class="settings-row-icon">🥦</span>
               <span class="settings-row-label">Ernährungsweise</span>
             </div>
-            <span class="settings-row-value">${(s.diets || ['alles']).join(', ')}</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${(s.diets || []).map(d => dietLabels[d] || d).join(', ') || '–'}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
+          </div>
+          <div class="settings-row" id="row-aufwand">
+            <div class="settings-row-left">
+              <span class="settings-row-icon">⏱️</span>
+              <span class="settings-row-label">Aufwand & Kochzeit</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">${s.mealConfig?.lunch?.mealprep ? 'Meal Prep' : ''} ${['Sehr schnell','Schnell','Normal','Aufwendig'][s.mealConfig?.dinner?.level ?? 2]}</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
         </div>
       </div>
 
+      <!-- APP -->
       <div class="settings-section">
         <div class="settings-section-label">App</div>
         <div class="settings-group">
@@ -633,7 +691,10 @@ Screens.settings = function(el, params) {
               <span class="settings-row-icon">🔑</span>
               <span class="settings-row-label">Claude API Key</span>
             </div>
-            <span class="settings-row-value">sk-ant-••••••</span>
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="settings-row-value">sk-ant-••••••</span>
+              <span style="color:#ccc;font-size:14px">›</span>
+            </div>
           </div>
           <div class="settings-row" id="row-reset">
             <div class="settings-row-left">
@@ -644,27 +705,41 @@ Screens.settings = function(el, params) {
         </div>
       </div>
 
-      <div style="padding:0 16px 8px;font-size:12px;color:var(--text-3);text-align:center">
+      <div style="padding:0 16px 32px;font-size:12px;color:var(--text-3);text-align:center">
         Herbi · Nur für dich · Berlin 🌿
       </div>
     </div>
   `;
 
-  // Edit settings → back to onboarding
+  // Plan erstellen
+  el.querySelector('#create-plan-btn').addEventListener('click', () => {
+    const week = Store.getCurrentWeekKey();
+    Router.navigate('plan-generating');
+  });
+
+  // Einkauf Einstellungen
   el.querySelector('#row-markets').addEventListener('click',  () => Router.navigate('onboarding-markets', { fromSettings: true }));
   el.querySelector('#row-budget').addEventListener('click',   () => Router.navigate('onboarding-budget',  { fromSettings: true }));
   el.querySelector('#row-portions').addEventListener('click', () => Router.navigate('onboarding-budget',  { fromSettings: true }));
+  el.querySelector('#row-meals').addEventListener('click',    () => Router.navigate('onboarding-budget',  { fromSettings: true }));
+
+  // Küche Einstellungen
   el.querySelector('#row-cuisines').addEventListener('click', () => Router.navigate('onboarding-cuisine', { fromSettings: true }));
   el.querySelector('#row-diets').addEventListener('click',    () => Router.navigate('onboarding-cuisine', { fromSettings: true }));
+  el.querySelector('#row-aufwand').addEventListener('click',  () => Router.navigate('onboarding-cuisine', { fromSettings: true }));
 
+  // API Key ändern
   el.querySelector('#row-apikey').addEventListener('click', () => {
-    const key = prompt('Neuen Claude API Key eingeben:');
+    const key = prompt('Neuen Claude API Key eingeben (sk-ant-...):');
     if (key && key.startsWith('sk-ant-')) {
       localStorage.setItem('herbi_api_key', key);
-      alert('API Key gespeichert ✓');
+      Router.navigate('settings');
+    } else if (key) {
+      alert('Ungültiger Key – muss mit sk-ant- beginnen');
     }
   });
 
+  // Reset
   el.querySelector('#row-reset').addEventListener('click', () => {
     if (confirm('Alle Daten und Pläne löschen?')) {
       localStorage.clear();
