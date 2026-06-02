@@ -1,26 +1,28 @@
 // ============================================
 // HERBI – Service Worker (sw.js)
-// Ermöglicht Offline-Nutzung der App
 // ============================================
 
-const CACHE_NAME = 'herbi-v1';
+const CACHE_NAME  = 'herbi-v2';
+const BASE        = '/herbi';
 
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/css/app.css',
-  '/js/store.js',
-  '/js/router.js',
-  '/js/api.js',
-  '/js/app.js',
-  '/screens/onboarding.js',
-  '/screens/plan.js',
-  '/screens/recipe.js',
-  '/screens/list.js',
+  BASE + '/',
+  BASE + '/index.html',
+  BASE + '/manifest.json',
+  BASE + '/css/app.css',
+  BASE + '/js/store.js',
+  BASE + '/js/router.js',
+  BASE + '/js/api.js',
+  BASE + '/js/app.js',
+  BASE + '/screens/onboarding.js',
+  BASE + '/screens/plan.js',
+  BASE + '/screens/recipe.js',
+  BASE + '/screens/list.js',
+  BASE + '/icon-192.png',
+  BASE + '/icon-512.png',
+  BASE + '/apple-touch-icon.png',
 ];
 
-// Installation – alle wichtigen Dateien cachen
 self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
@@ -29,7 +31,6 @@ self.addEventListener('install', event => {
   );
 });
 
-// Activation – alte Caches löschen
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys().then(keys =>
@@ -40,29 +41,26 @@ self.addEventListener('activate', event => {
   );
 });
 
-// Fetch – Cache First für App-Dateien, Network First für API
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Anthropic API immer online
+  // API calls immer online lassen
   if (url.hostname === 'api.anthropic.com' || url.hostname === 'api.getbring.com') {
-    return; // Standard fetch, kein Cache
+    return;
   }
 
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
       return fetch(event.request).then(response => {
-        // Erfolgreiche Responses cachen
         if (response && response.status === 200 && response.type === 'basic') {
           const clone = response.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
         }
         return response;
       }).catch(() => {
-        // Offline-Fallback
         if (event.request.destination === 'document') {
-          return caches.match('/index.html');
+          return caches.match(BASE + '/index.html');
         }
       });
     })
