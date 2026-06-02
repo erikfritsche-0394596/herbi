@@ -98,8 +98,7 @@ Screens.list = function(el, params) {
     });
   }
 
-  let allItems = [];
-  try { allItems = buildShoppingList(); } catch(e) { console.error('buildShoppingList error:', e); }
+  const allItems = buildShoppingList();
   let activeFilter  = 'alle';
 
   // Surplus-Tracking: wie viel hat der User gekauft?
@@ -156,6 +155,10 @@ Screens.list = function(el, params) {
   function render() {
     const done = doneCount();
     const p    = pct();
+    const TL = {breakfast:'Frühstück', lunch:'Mittag', dinner:'Abend'};
+    const filterLabel = mealFilter
+      ? [...mealFilter].map(id => { const pts = id.split('-'); return pts[0]+' '+(TL[pts[1]]||pts[1]); }).join(', ')
+      : '';
 
     el.innerHTML = `
       <div style="display:flex;flex-direction:column;min-height:100%">
@@ -197,11 +200,7 @@ Screens.list = function(el, params) {
           ${mealFilter ? `
           <div style="display:flex;align-items:center;gap:8px;padding:6px 0 8px">
             <div style="flex:1;font-size:12px;color:var(--text-2)">
-              ${[...mealFilter].map(id => {
-                const [d,t] = id.split('-');
-                const tl = {breakfast:'Frühstück',lunch:'Mittag',dinner:'Abend'};
-                return d + ' ' + (tl[t]||t);
-              }).join(', ')}
+              ${filterLabel}
             </div>
             <button id="clear-filter-btn" style="font-size:11px;font-weight:600;color:var(--green);background:transparent;border:none;cursor:pointer;padding:4px 0;white-space:nowrap">
               Alle anzeigen ✕
@@ -241,12 +240,6 @@ Screens.list = function(el, params) {
         </div>
       </div>
     `;
-
-    } catch(renderErr) {
-      console.error('List render error:', renderErr);
-      el.innerHTML = '<div style="padding:40px;text-align:center;color:#999;font-size:13px">Fehler beim Laden.<br><button onclick="goBack()" style="margin-top:12px;padding:8px 16px;border-radius:8px;background:#2D7D3A;color:#fff;border:none;cursor:pointer">Zurück</button></div>';
-      return;
-    }
 
     // Events
     el.querySelector('#back-btn').addEventListener('click', () => goBack());
