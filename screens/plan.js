@@ -23,6 +23,16 @@ Screens.plan = function(el, params) {
     'schnell':      { l:'Schnell',      c:'tag-gray'  },
   };
 
+
+  // Einstellungen vollständig ausgefüllt?
+  function settingsComplete() {
+    const s = Store.getSettings();
+    return !!(
+      s.supermarkets?.length > 0 &&
+      s.budget > 0 &&
+      s.cuisines?.length > 0
+    );
+  }
   // --- State ---
   let allWeeks      = [];   // ['2026-W22', '2026-W23', ...]
   let activeWeekIdx = 0;
@@ -322,13 +332,20 @@ Screens.plan = function(el, params) {
         <div class="empty-state">
           <div class="empty-emoji">📅</div>
           <div class="empty-text">${weekLabel(key)} (${weekSubLabel(key)})<br>hat noch keinen Plan.</div>
-          <button class="primary-btn" id="gen-btn">
+          <button class="primary-btn" id="gen-btn" ${settingsComplete() ? '' : 'disabled style="background:#9a9a94;cursor:default"'}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
             Woche planen
           </button>
+          ${!settingsComplete() ? '<div style="font-size:12px;color:var(--text-3);margin-top:8px">Bitte zuerst in <b>Einstellungen</b> Supermärkte und Küche auswählen.</div>' : ''}
         </div>
       `;
-      content.querySelector('#gen-btn').addEventListener('click', generateNewWeek);
+      content.querySelector('#gen-btn')?.addEventListener('click', () => {
+      if (!settingsComplete()) {
+        Router.navigate('settings');
+      } else {
+        generateNewWeek();
+      }
+    });
       return;
     }
 
@@ -563,8 +580,6 @@ Screens.plan = function(el, params) {
 // ============================================
 Screens.settings = function(el, params) {
   const s = Store.getSettings();
-  const hasPlan = !!Store.getPlan(Store.getCurrentWeekKey());
-
   const MARKET_NAMES = {
     rewe:'Rewe', edeka:'Edeka', lidl:'Lidl',
     netto:'Netto', denns:"denn\'s", goasia:'Go Asia',
@@ -589,14 +604,7 @@ Screens.settings = function(el, params) {
         </div>
       </div>
 
-      <!-- Plan erstellen Button -->
-      <div style="padding:0 16px 16px">
-        <button id="create-plan-btn" style="width:100%;padding:15px;border-radius:14px;background:${hasPlan ? '#2D7D3A' : '#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-          ${hasPlan ? 'Neuen Plan erstellen' : 'Plan erstellen – Einstellungen zuerst vornehmen'}
-        </button>
-        ${!hasPlan ? '<div style="font-size:11px;color:#9a9a94;text-align:center;margin-top:6px">Bitte erst Einkauf und Küche einstellen ↓</div>' : ''}
-      </div>
+
 
       <!-- EINKAUF -->
       <div class="settings-section">
@@ -710,12 +718,6 @@ Screens.settings = function(el, params) {
       </div>
     </div>
   `;
-
-  // Plan erstellen
-  el.querySelector('#create-plan-btn').addEventListener('click', () => {
-    const week = Store.getCurrentWeekKey();
-    Router.navigate('plan-generating');
-  });
 
   // Einkauf Einstellungen
   el.querySelector('#row-markets').addEventListener('click',  () => Router.navigate('onboarding-markets', { fromSettings: true }));
