@@ -6,9 +6,8 @@
 
 const API = (() => {
 
-  // ⚠️  HIER deinen Claude API Key eintragen:
-  // Gehe zu https://console.anthropic.com → API Keys → Create Key
-  const CLAUDE_API_KEY = 'sk-ant-DEIN-KEY-HIER';
+  // API Key wird aus config.js geladen (nicht im Repo!)
+  const CLAUDE_API_KEY = typeof CONFIG !== 'undefined' ? CONFIG.CLAUDE_API_KEY : '';
 
   // ============================================
   // CLAUDE API – Wochenplan generieren
