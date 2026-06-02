@@ -101,6 +101,7 @@ function registerServiceWorker() {
 document.addEventListener('DOMContentLoaded', () => {
 
   // Screens registrieren
+  Router.register('apiKey',              Screens.apiKey);
   Router.register('onboarding-markets',  Screens.onboardingMarkets);
   Router.register('onboarding-budget',   Screens.onboardingBudget);
   Router.register('onboarding-cuisine',  Screens.onboardingCuisine);
@@ -115,9 +116,16 @@ document.addEventListener('DOMContentLoaded', () => {
   registerServiceWorker();
 
   // Ersten Screen bestimmen
-  if (Store.isOnboardingDone()) {
+  const hasApiKey = !!localStorage.getItem('herbi_api_key');
+
+  if (!hasApiKey) {
+    // Kein Key → einmaliger Key-Screen
+    Router.navigate('apiKey', {}, { replace: true });
+  } else if (Store.isOnboardingDone()) {
+    // Alles vorhanden → direkt zum Plan
     Router.navigate('plan', {}, { replace: true });
   } else {
+    // Key da aber Onboarding noch nicht abgeschlossen
     Router.navigate('onboarding-markets', {}, { replace: true });
   }
 });
