@@ -23,10 +23,17 @@ Screens.pantry = function(el, params) {
 
   function freshnessLabel(item) {
     const days = daysSince(item.addedAt);
-    if (!item.isFresh) return { label: 'Trocken', color: '#2D7D3A', bg: '#EAF3DE' };
+    const cat  = item.storageCategory || guessCategory(item.name);
+    if (cat === 'trocken') return { label: 'Trocken', color: '#2D7D3A', bg: '#EAF3DE' };
+    if (cat === 'kühl') {
+      if (days <= 3)  return { label: 'Kühlschrank', color: '#185FA5', bg: '#E6F1FB' };
+      if (days <= 7)  return { label: `${days}T alt`, color: '#F97B22', bg: '#FAEEDA' };
+      return { label: 'Bald weg!', color: '#E24B4A', bg: '#FAECE7' };
+    }
+    // frisch
     if (days === 0) return { label: 'Heute', color: '#2D7D3A', bg: '#EAF3DE' };
     if (days === 1) return { label: 'Gestern', color: '#F97B22', bg: '#FAEEDA' };
-    if (days <= 3) return { label: `Vor ${days}T`, color: '#F97B22', bg: '#FAEEDA' };
+    if (days <= 3)  return { label: `${days}T alt`, color: '#F97B22', bg: '#FAEEDA' };
     return { label: 'Aufbrauchen!', color: '#E24B4A', bg: '#FAECE7' };
   }
 
@@ -115,8 +122,9 @@ Antworte NUR mit JSON (kein Markdown):
 
   function render() {
     const items    = getPantryItems();
-    const fresh    = items.filter(i => i.isFresh);
-    const dry      = items.filter(i => !i.isFresh);
+    const frisch  = items.filter(i => (i.storageCategory || guessCategory(i.name)) === 'frisch');
+    const kuehl   = items.filter(i => (i.storageCategory || guessCategory(i.name)) === 'kühl');
+    const trocken = items.filter(i => (i.storageCategory || guessCategory(i.name)) === 'trocken');
     const hasItems = items.length > 0;
 
     el.innerHTML = `
@@ -127,10 +135,7 @@ Antworte NUR mit JSON (kein Markdown):
           <div class="page-header-row">
             <h1 class="page-title">Vorrat</h1>
             <div style="display:flex;gap:6px">
-              ${hasItems ? `
-              <div class="icon-btn" id="gen-btn" title="Rezepte generieren">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
-              </div>` : ''}
+  
               <div class="icon-btn" id="add-btn" title="Manuell hinzufügen">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </div>
@@ -142,13 +147,13 @@ Antworte NUR mit JSON (kein Markdown):
               <div style="font-size:18px;font-weight:500;color:var(--color-text-primary)">${items.length}</div>
               <div style="font-size:10px;color:var(--color-text-tertiary)">Artikel</div>
             </div>
-            <div style="flex:1;background:${fresh.length > 0 ? '#FAEEDA' : 'var(--color-background-secondary)'};border-radius:var(--radius-md);padding:8px 12px;text-align:center">
-              <div style="font-size:18px;font-weight:500;color:${fresh.length > 0 ? '#633806' : 'var(--color-text-primary)'}">${fresh.length}</div>
-              <div style="font-size:10px;color:${fresh.length > 0 ? '#633806' : 'var(--color-text-tertiary)'}">Frisch</div>
+            <div style="flex:1;background:${frisch.length > 0 ? '#FAEEDA' : 'var(--color-background-secondary)'};border-radius:var(--radius-md);padding:8px 12px;text-align:center">
+              <div style="font-size:18px;font-weight:500;color:${frisch.length > 0 ? '#633806' : 'var(--color-text-primary)'}">${frisch.length}</div>
+              <div style="font-size:10px;color:${frisch.length > 0 ? '#633806' : 'var(--color-text-tertiary)'}">Frisch</div>
             </div>
             <div style="flex:1;background:var(--color-background-secondary);border-radius:var(--radius-md);padding:8px 12px;text-align:center">
-              <div style="font-size:18px;font-weight:500;color:var(--color-text-primary)">${dry.length}</div>
-              <div style="font-size:10px;color:var(--color-text-tertiary)">Trocken</div>
+              <div style="font-size:18px;font-weight:500;color:var(--color-text-primary)">${kuehl.length}</div>
+              <div style="font-size:10px;color:var(--color-text-tertiary)">Kühl</div>
             </div>
           </div>` : ''}
         </div>
@@ -166,26 +171,29 @@ Antworte NUR mit JSON (kein Markdown):
           </div>
           ` : `
 
-          ${fresh.length > 0 ? `
+          ${frisch.length > 0 ? `
           <div style="margin-bottom:14px">
-            <div class="sec-label" style="margin-bottom:8px">Frisch – bald aufbrauchen</div>
-            ${fresh.map(item => renderItem(item)).join('')}
+            <div class="sec-label" style="margin-bottom:8px">🌿 Frisch – bald aufbrauchen</div>
+            ${frisch.map(item => renderItem(item)).join('')}
           </div>` : ''}
 
-          ${dry.length > 0 ? `
+          ${kuehl.length > 0 ? `
+          <div style="margin-bottom:14px">
+            <div class="sec-label" style="margin-bottom:8px">❄️ Kühlschrank</div>
+            ${kuehl.map(item => renderItem(item)).join('')}
+          </div>` : ''}
+
+          ${trocken.length > 0 ? `
           <div style="margin-bottom:16px">
-            <div class="sec-label" style="margin-bottom:8px">Trocken – hält länger</div>
-            ${dry.map(item => renderItem(item)).join('')}
+            <div class="sec-label" style="margin-bottom:8px">📦 Trocken – hält länger</div>
+            ${trocken.map(item => renderItem(item)).join('')}
           </div>` : ''}
 
           <!-- KI Rezeptvorschläge -->
           <div style="margin-bottom:16px">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
               <div class="sec-label" style="margin-bottom:0">KI-Rezeptvorschläge</div>
-              ${!loadingRecipes && suggestedRecipes.length === 0 && !generationError ? `
-              <button id="load-recipes-btn" style="font-size:11px;font-weight:500;color:#2D7D3A;background:transparent;border:none;cursor:pointer">
-                Vorschläge laden ✨
-              </button>` : ''}
+  
             </div>
 
             ${loadingRecipes ? `
@@ -199,8 +207,12 @@ Antworte NUR mit JSON (kein Markdown):
               <button id="retry-btn" style="display:block;margin-top:8px;padding:6px 12px;border-radius:8px;background:#E24B4A;color:#fff;font-size:11px;font-weight:500;border:none;cursor:pointer">Nochmal versuchen</button>
             </div>
             ` : suggestedRecipes.length > 0 ? suggestedRecipes.map((recipe, i) => renderRecipeCard(recipe, i)).join('') : `
-            <div style="padding:12px;background:var(--color-background-secondary);border-radius:var(--radius-md);font-size:12px;color:var(--color-text-secondary);text-align:center">
-              Tippe oben auf ✨ oder "Vorschläge laden" um KI-Rezepte zu generieren.
+            <div style="padding:14px;background:var(--color-background-secondary);border-radius:var(--radius-md);text-align:center">
+              <div style="font-size:13px;color:var(--color-text-secondary);margin-bottom:10px">KI schaut was du kochen kannst.</div>
+              <button id="load-recipes-btn" style="padding:10px 20px;border-radius:10px;background:#2D7D3A;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;display:inline-flex;align-items:center;gap:6px">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>
+                Rezepte generieren
+              </button>
             </div>
             `}
           </div>
@@ -210,7 +222,6 @@ Antworte NUR mit JSON (kein Markdown):
     `;
 
     // Events
-    el.querySelector('#gen-btn')?.addEventListener('click', generatePantryRecipes);
     el.querySelector('#load-recipes-btn')?.addEventListener('click', generatePantryRecipes);
     el.querySelector('#retry-btn')?.addEventListener('click', generatePantryRecipes);
     el.querySelector('#empty-add-btn')?.addEventListener('click', showAddModal);
@@ -354,7 +365,7 @@ Antworte NUR mit JSON (kein Markdown):
     const key    = name.toLowerCase().trim().replace(/\s+/g, '-');
     const isFresh = /ei|eier|milch|joghurt|fleisch|fisch|lachs|tofu|gemüse|tomate|salat|karotte|paprika|brokkoli|spinat/.test(name.toLowerCase());
 
-    Store.savePantryItem({ key, name, emoji: '🥡', amount, unit, isFresh, addedAt: new Date().toISOString() });
+    Store.savePantryItem({ key, name, emoji: '🥡', amount, unit, storageCategory: guessCategory(name), addedAt: new Date().toISOString() });
     render();
   }
 
