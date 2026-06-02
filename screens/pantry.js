@@ -265,21 +265,75 @@ Antworte NUR mit JSON (kein Markdown):
       btn.addEventListener('click', () => {
         const recipe = suggestedRecipes[parseInt(btn.dataset.addPlan)];
         if (!recipe) return;
-        // Zutaten aus Vorrat abziehen
+
+        // Aktuellen Wochenplan holen oder neuen anlegen
+        const weekKey = Store.getCurrentWeekKey();
+        let plan = Store.getPlan(weekKey);
+
+        // Heutigen Tag + freien Slot finden
+        const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+        const todayIdx = getTodayIndex();
+        const todayKey = DAYS[todayIdx];
+
+        // Meal-Objekt aus Vorrats-Rezept bauen
+        const mealObj = {
+          name:         recipe.name,
+          emoji:        recipe.emoji || '🍽️',
+          price:        recipe.extra_cost || 0,
+          time_min:     recipe.time_min || 20,
+          tags:         [...(recipe.tags || []), 'aus-vorrat'],
+          ingredients:  (recipe.uses_pantry || []).map(n => ({ name: n, amount: 1, unit: 'Stück' })),
+          steps:        recipe.steps || [],
+          from_pantry:  true,
+        };
+
+        if (!plan) {
+          // Noch kein Plan – einfachen Plan mit diesem Rezept anlegen
+          const emptyDays = {};
+          DAYS.forEach(d => { emptyDays[d] = {}; });
+          emptyDays[todayKey].dinner = mealObj;
+          Store.savePlan(weekKey, { meals: emptyDays, total_cost: 0 });
+        } else {
+          // Freien Slot finden (Abend bevorzugt, sonst Mittag)
+          const slots = ['dinner', 'lunch'];
+          let saved = false;
+          // Erst heute, dann die nächsten Tage
+          for (let offset = 0; offset < 7 && !saved; offset++) {
+            const dayKey = DAYS[(todayIdx + offset) % 7];
+            for (const slot of slots) {
+              if (!plan.meals[dayKey]?.[slot] || plan.meals[dayKey][slot].is_rest) {
+                if (!plan.meals[dayKey]) plan.meals[dayKey] = {};
+                plan.meals[dayKey][slot] = mealObj;
+                Store.savePlan(weekKey, plan);
+                saved = true;
+                break;
+              }
+            }
+          }
+          if (!saved) {
+            // Alle Slots voll – heute Abend überschreiben
+            if (!plan.meals[todayKey]) plan.meals[todayKey] = {};
+            plan.meals[todayKey].dinner = mealObj;
+            Store.savePlan(weekKey, plan);
+          }
+        }
+
+        // Vorrat abziehen
         const pantry = Store.getPantry();
-        const toDeduct = recipe.uses_pantry?.map(name => {
-          const key = name.toLowerCase().trim().replace(/\s+/g, '-');
-          const item = pantry[key];
+        const toDeduct = (recipe.uses_pantry || []).map(name => {
+          const k = name.toLowerCase().trim().replace(/\s+/g, '-');
+          const item = pantry[k];
           return item ? { name, amount: item.amount, unit: item.unit } : null;
-        }).filter(Boolean) || [];
+        }).filter(Boolean);
         Store.deductPantryForMeal(toDeduct);
 
         // Toast zeigen
         const toast = document.createElement('div');
-        toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap';
-        toast.textContent = `✓ ${recipe.name} zum Plan hinzugefügt`;
+        toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+        const DAYS_SHORT = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+        toast.textContent = `✓ ${recipe.name} → ${todayKey} hinzugefügt`;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 2500);
+        setTimeout(() => toast.remove(), 3000);
 
         navigate('plan');
       });
