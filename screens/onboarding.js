@@ -568,18 +568,39 @@ Screens['plan-generating'] = async function(el, params) {
   } catch (err) {
     clearInterval(interval);
     console.error('Plan generation failed:', err);
+    const errMsg = err.message || String(err);
     el.innerHTML = `
-      <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:40px">
+      <div style="min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:32px">
         <div style="font-size:48px">😕</div>
-        <div style="font-size:18px;font-weight:700;color:var(--text);text-align:center">Plan konnte nicht erstellt werden</div>
-        <div style="font-size:13px;color:var(--text-2);text-align:center;line-height:1.5;max-width:280px">${err.message}</div>
-        <button id="back-btn" style="padding:12px 24px;border-radius:12px;background:var(--green);color:#fff;font-size:14px;font-weight:600;border:none;cursor:pointer;margin-top:8px">
-          Zurück
-        </button>
+        <div style="font-size:18px;font-weight:700;color:#1a1a18;text-align:center">Plan konnte nicht erstellt werden</div>
+        <div style="font-size:13px;color:#5a5a56;text-align:center;line-height:1.6;max-width:300px;background:#f5f5f0;padding:12px;border-radius:12px;word-break:break-all">${errMsg}</div>
+        <div style="font-size:12px;color:#9a9a94;text-align:center;line-height:1.6;max-width:300px">
+          Häufige Ursachen:<br>
+          • API Key falsch oder abgelaufen<br>
+          • Kein Guthaben auf console.anthropic.com<br>
+          • Internetverbindung unterbrochen
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center">
+          <button id="back-btn" style="padding:12px 20px;border-radius:12px;background:#f5f5f0;color:#1a1a18;font-size:14px;font-weight:600;border:1px solid #ddd;cursor:pointer">
+            ← Zurück
+          </button>
+          <button id="fix-key-btn" style="padding:12px 20px;border-radius:12px;background:#2D7D3A;color:#fff;font-size:14px;font-weight:600;border:none;cursor:pointer">
+            🔑 API Key ändern
+          </button>
+        </div>
       </div>
     `;
     el.querySelector('#back-btn').addEventListener('click', () => {
       Router.navigate('onboarding-cuisine');
+    });
+    el.querySelector('#fix-key-btn')?.addEventListener('click', () => {
+      const key = prompt('Neuen Claude API Key eingeben (sk-ant-...):');
+      if (key && key.startsWith('sk-ant-')) {
+        localStorage.setItem('herbi_api_key', key);
+        Router.navigate('plan-generating');
+      } else if (key) {
+        alert('Ungültiger Key – muss mit sk-ant- beginnen');
+      }
     });
   }
 };
