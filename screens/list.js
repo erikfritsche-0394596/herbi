@@ -98,7 +98,8 @@ Screens.list = function(el, params) {
     });
   }
 
-  const allItems    = buildShoppingList();
+  let allItems = [];
+  try { allItems = buildShoppingList(); } catch(e) { console.error('buildShoppingList error:', e); }
   let activeFilter  = 'alle';
 
   // Surplus-Tracking: wie viel hat der User gekauft?
@@ -240,6 +241,12 @@ Screens.list = function(el, params) {
         </div>
       </div>
     `;
+
+    } catch(renderErr) {
+      console.error('List render error:', renderErr);
+      el.innerHTML = '<div style="padding:40px;text-align:center;color:#999;font-size:13px">Fehler beim Laden.<br><button onclick="goBack()" style="margin-top:12px;padding:8px 16px;border-radius:8px;background:#2D7D3A;color:#fff;border:none;cursor:pointer">Zurück</button></div>';
+      return;
+    }
 
     // Events
     el.querySelector('#back-btn').addEventListener('click', () => goBack());
