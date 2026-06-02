@@ -9,9 +9,11 @@ Screens.pantry = function(el, params) {
   function getPantryItems() {
     const pantry = Store.getPantry();
     return Object.values(pantry).sort((a, b) => {
-      // Frisches zuerst
-      if (a.isFresh && !b.isFresh) return -1;
-      if (!a.isFresh && b.isFresh) return 1;
+      // Sortierung: frisch → kühl → trocken
+      const order = { frisch: 0, kühl: 1, trocken: 2 };
+      const catA = order[a.storageCategory || guessCategory(a.name)] ?? 1;
+      const catB = order[b.storageCategory || guessCategory(b.name)] ?? 1;
+      if (catA !== catB) return catA - catB;
       return new Date(b.addedAt) - new Date(a.addedAt);
     });
   }
@@ -417,7 +419,6 @@ Antworte NUR mit JSON (kein Markdown):
     const amount = match ? parseFloat(match[1]) : 1;
     const unit   = match ? match[2].trim() : 'Stück';
     const key    = name.toLowerCase().trim().replace(/\s+/g, '-');
-    const isFresh = /ei|eier|milch|joghurt|fleisch|fisch|lachs|tofu|gemüse|tomate|salat|karotte|paprika|brokkoli|spinat/.test(name.toLowerCase());
 
     Store.savePantryItem({ key, name, emoji: '🥡', amount, unit, storageCategory: guessCategory(name), addedAt: new Date().toISOString() });
     render();
