@@ -117,7 +117,9 @@ Screens.list = function(el, params) {
 
   function guessFresh(item) {
     const n = item.name.toLowerCase();
-    return /ei|eier|fleisch|fisch|lachs|garnelen|tofu|milch|joghurt|quark|ricotta|mozzarella|brokkoli|spinat|salat|tomate|gurke|avocado|karotte|paprika|zucchini/.test(n);
+    if (/brokkoli|spinat|salat|tomate|gurke|avocado|paprika|zucchini|karotte|zwiebel|frühlingszwiebel|lauch|knoblauch|ingwer|kräuter|petersilie|basilikum|koriander|schnittlauch|pilz|champignon|aubergine/.test(n)) return 'frisch';
+    if (/tofu|seidentofu|tempeh|lachs|fisch|fleisch|hähnchen|garnelen|milch|joghurt|quark|ricotta|mozzarella|feta|parmesan|käse|sahne|butter|ei|eier/.test(n)) return 'kühl';
+    return 'trocken';
   }
 
   function getSurplus(item) {
@@ -304,9 +306,9 @@ Screens.list = function(el, params) {
         .filter(item => getSurplus(item) > 0)
         .map(item => ({
           ...item,
-          surplusAmount: getSurplus(item),
-          isFresh: guessFresh(item),
-          emoji: item.emoji || '🥡',
+          surplusAmount:   getSurplus(item),
+          storageCategory: guessFresh(item),
+          emoji:           item.emoji || '🥡',
         }));
       Store.savePantryItems(surplusItems);
       // Navigate to pantry tab
