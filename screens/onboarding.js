@@ -41,8 +41,8 @@ Screens.apiKey = function(el, params) {
           Noch keinen Key? → console.anthropic.com ↗
         </a>
 
-        <button id="api-key-btn" style="width:100%;padding:17px;border-radius:16px;background:var(--green);color:#fff;font-size:17px;font-weight:700;border:none;cursor:pointer;opacity:0.35" disabled>
-          Weiter
+        <button id="api-key-btn" style="width:100%;padding:17px;border-radius:16px;background:#2D7D3A;color:#fff;font-size:17px;font-weight:700;border:none;cursor:pointer;opacity:0.35;margin-top:8px;display:block" disabled>
+          Weiter →
         </button>
       </div>
     </div>
