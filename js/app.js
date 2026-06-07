@@ -112,6 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.register('share',               Screens.share);
   Router.register('settings',            Screens.settings);
   Router.register('pantry',              Screens.pantry);
+  Router.register('cookbook',            Screens.cookbook);
+  Router.register('cookbook-recipe',     Screens['cookbook-recipe']);
 
   // Service Worker
   registerServiceWorker();
