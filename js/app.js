@@ -114,6 +114,8 @@ document.addEventListener('DOMContentLoaded', () => {
   Router.register('pantry',              Screens.pantry);
   Router.register('cookbook',            Screens.cookbook);
   Router.register('cookbook-recipe',     Screens['cookbook-recipe']);
+  Router.register('cookbook-import',     Screens['cookbook-import']);
+  Router.register('shortcut-guide',      Screens['shortcut-guide']);
 
   // Service Worker
   registerServiceWorker();
@@ -122,14 +124,19 @@ document.addEventListener('DOMContentLoaded', () => {
   const hasApiKey = !!localStorage.getItem('herbi_api_key');
   const hasPlan   = !!Store.getPlan(Store.getCurrentWeekKey());
 
+  // Prüfen ob eine URL zum Importieren übergeben wurde
+  // Vom Shortcut: https://erikfritsche-0394596.github.io/herbi/?import=URL
+  const urlParams = new URLSearchParams(window.location.search);
+  const importUrl = urlParams.get('import');
+
   if (!hasApiKey) {
-    // Kein Key → einmaliger Key-Screen
     Router.navigate('apiKey', {}, { replace: true });
+  } else if (importUrl) {
+    // URL importieren → direkt zum Import-Screen
+    Router.navigate('cookbook-import', { importUrl: decodeURIComponent(importUrl) }, { replace: true });
   } else if (hasPlan) {
-    // Plan vorhanden → direkt zum Wochenplan
     Router.navigate('plan', {}, { replace: true });
   } else {
-    // Key da aber noch kein Plan → Einstellungen
     Router.navigate('settings', {}, { replace: true });
   }
 });
