@@ -74,6 +74,9 @@ Screens.cookbook = function(el, params) {
             <h1 class="page-title">Rezeptebuch</h1>
             <div style="display:flex;gap:6px;align-items:center">
               <span style="font-size:12px;color:var(--color-text-tertiary);font-weight:500">${total} Rezepte</span>
+              <div class="icon-btn" id="import-btn" title="Rezept importieren">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+              </div>
             </div>
           </div>
 
@@ -124,6 +127,11 @@ Screens.cookbook = function(el, params) {
         </div>
       </div>
     `;
+
+    // Import from URL
+    el.querySelector('#import-btn')?.addEventListener('click', () => {
+      Router.navigate('cookbook-import', {});
+    });
 
     // Search
     el.querySelector('#search-input')?.addEventListener('input', e => {
@@ -394,4 +402,306 @@ Screens['cookbook-recipe'] = function(el, params) {
   }
 
   render();
+};
+
+// ============================================
+// COOKBOOK IMPORT SCREEN
+// ============================================
+Screens['cookbook-import'] = async function(el, params) {
+  const { importUrl } = params || {};
+
+  let url        = importUrl || '';
+  let status     = importUrl ? 'loading' : 'idle'; // idle | loading | success | error
+  let errorMsg   = '';
+  let importedRecipe = null;
+
+  async function analyzeUrl(targetUrl) {
+    status = 'loading';
+    errorMsg = '';
+    render();
+
+    try {
+      const apiKey = localStorage.getItem('herbi_api_key');
+      if (!apiKey) throw new Error('Kein API Key gespeichert.');
+
+      const prompt = `Analysiere diese URL und extrahiere das Rezept daraus.
+
+URL: ${targetUrl}
+
+Falls es sich um eine TikTok/Instagram/YouTube URL handelt, extrahiere was du aus der URL und dem Kontext ableiten kannst.
+Falls es eine normale Website ist, extrahiere das vollständige Rezept.
+
+Antworte NUR mit einem JSON-Objekt (kein Markdown):
+{
+  "name": "Rezeptname",
+  "emoji": "🍝",
+  "source_url": "${targetUrl}",
+  "source_type": "website|tiktok|instagram|youtube|other",
+  "time_min": 30,
+  "tags": ["vegetarisch", "italienisch"],
+  "ingredients": [
+    {"name": "Zutat", "amount": 200, "unit": "g"}
+  ],
+  "steps": [
+    {"text": "Schritt 1...", "timer_min": null}
+  ],
+  "notes": "Optionale Notiz vom Original"
+}
+
+Falls du kein Rezept extrahieren kannst, antworte mit:
+{"error": "Kurze Erklärung warum"}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const text = data.content[0].text.trim()
+        .replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const result = JSON.parse(text);
+
+      if (result.error) throw new Error(result.error);
+
+      importedRecipe = result;
+      status = 'success';
+
+    } catch(err) {
+      console.error('Import error:', err);
+      errorMsg = err.message;
+      status = 'error';
+    }
+    render();
+  }
+
+  function render() {
+    const SOURCE_ICONS = {
+      tiktok: '🎵', instagram: '📸', youtube: '▶️',
+      website: '🌐', other: '🔗'
+    };
+
+    el.innerHTML = `
+      <div style="display:flex;flex-direction:column;min-height:100%">
+        <div class="status-spacer"></div>
+
+        <div class="page-header">
+          <div class="page-header-row">
+            <div style="display:flex;align-items:center;gap:10px">
+              <div class="recipe-hero-btn left" style="position:static" id="back-btn">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15,18 9,12 15,6"/></svg>
+              </div>
+              <h1 class="page-title">Rezept importieren</h1>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1;padding:0 16px 16px;overflow-y:auto">
+
+          ${status === 'idle' || status === 'error' ? `
+          <!-- URL Eingabe -->
+          <div style="margin-bottom:16px">
+            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">Rezept-URL einfügen</div>
+            <div style="position:relative">
+              <input
+                id="url-input"
+                type="url"
+                placeholder="https://... oder TikTok/Instagram Link"
+                value="${url}"
+                style="width:100%;padding:13px 44px 13px 14px;border-radius:12px;border:1.5px solid ${status==='error'?'#E24B4A':'var(--color-border-secondary)'};background:var(--color-background-secondary);font-size:14px;color:var(--color-text-primary);outline:none;-webkit-appearance:none"
+              >
+              ${url ? `
+              <div id="clear-btn" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--color-text-tertiary);font-size:18px;line-height:1">×</div>
+              ` : ''}
+            </div>
+            ${status === 'error' ? `
+            <div style="margin-top:8px;padding:10px 12px;background:#FAECE7;border-radius:10px;font-size:12px;color:#712B13">
+              ${errorMsg}
+            </div>` : ''}
+          </div>
+
+          <button id="analyze-btn" style="width:100%;padding:14px;border-radius:14px;background:${url?'#2D7D3A':'#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:20px" ${!url?'disabled':''}>
+            Rezept analysieren ✨
+          </button>
+
+          <!-- Shortcut Anleitung -->
+          <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:16px;margin-bottom:12px">
+            <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">⚡ Tipp: Apple Shortcut einrichten</div>
+            <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:12px">
+              Einmalig einrichten → danach kannst du in TikTok, Instagram, Safari auf <b>Teilen</b> tippen und direkt zu Herbi schicken.
+            </div>
+            <button id="shortcut-btn" style="width:100%;padding:11px;border-radius:11px;background:#007AFF;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Shortcut-Anleitung anzeigen
+            </button>
+          </div>
+
+          <!-- Unterstützte Quellen -->
+          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-tertiary);margin-bottom:8px">Unterstützte Quellen</div>
+          <div style="display:flex;flex-wrap:wrap;gap:6px">
+            ${['🎵 TikTok','📸 Instagram','🌐 Websites','▶️ YouTube','📰 Blogs'].map(s=>`
+              <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)">${s}</span>
+            `).join('')}
+          </div>
+
+          ` : status === 'loading' ? `
+          <!-- Loading -->
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 0;gap:16px">
+            <div style="font-size:48px">🔍</div>
+            <div class="spinner"></div>
+            <div style="font-size:15px;font-weight:600;color:var(--color-text-primary)">Rezept wird analysiert…</div>
+            <div style="font-size:13px;color:var(--color-text-secondary);text-align:center;line-height:1.5">
+              Claude liest die Seite und<br>extrahiert Zutaten & Schritte
+            </div>
+            <div style="font-size:11px;color:var(--color-text-tertiary);background:var(--color-background-secondary);padding:6px 12px;border-radius:20px;max-width:260px;text-align:center;word-break:break-all">${url}</div>
+          </div>
+
+          ` : status === 'success' && importedRecipe ? `
+          <!-- Erfolg – Vorschau -->
+          <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:16px;margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+              <span style="font-size:40px">${importedRecipe.emoji || '🍽️'}</span>
+              <div>
+                <div style="font-size:16px;font-weight:700;color:var(--color-text-primary);line-height:1.3">${importedRecipe.name}</div>
+                <div style="font-size:11px;color:var(--color-text-secondary);margin-top:3px">
+                  ${SOURCE_ICONS[importedRecipe.source_type]||'🔗'} ${importedRecipe.source_type||''}
+                  ${importedRecipe.time_min ? ' · '+importedRecipe.time_min+' min' : ''}
+                </div>
+              </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+              ${(importedRecipe.tags||[]).map(t=>`<span class="tag tag-gray" style="font-size:10px">${t}</span>`).join('')}
+              <span class="tag" style="font-size:10px;background:#FAEEDA;color:#633806;font-weight:600">Noch nicht gekocht</span>
+            </div>
+            ${importedRecipe.ingredients?.length ? `
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">${importedRecipe.ingredients.length} Zutaten gefunden</div>` : ''}
+            ${importedRecipe.steps?.length ? `
+            <div style="font-size:12px;color:var(--color-text-secondary)">${importedRecipe.steps.length} Schritte gefunden</div>` : ''}
+          </div>
+
+          <button id="save-btn" style="width:100%;padding:14px;border-radius:14px;background:#2D7D3A;color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:10px">
+            📖 Ins Rezeptebuch speichern
+          </button>
+          <button id="retry-btn" style="width:100%;padding:11px;border-radius:12px;background:transparent;color:var(--color-text-secondary);font-size:13px;font-weight:500;border:0.5px solid var(--color-border-secondary);cursor:pointer">
+            Andere URL versuchen
+          </button>
+          ` : ''}
+
+        </div>
+      </div>
+    `;
+
+    // Events
+    el.querySelector('#back-btn')?.addEventListener('click', () => goBack());
+
+    el.querySelector('#url-input')?.addEventListener('input', e => {
+      url = e.target.value.trim();
+      const btn = el.querySelector('#analyze-btn');
+      if (btn) { btn.disabled = !url; btn.style.background = url ? '#2D7D3A' : '#9a9a94'; }
+    });
+
+    el.querySelector('#clear-btn')?.addEventListener('click', () => { url = ''; status = 'idle'; render(); });
+
+    el.querySelector('#analyze-btn')?.addEventListener('click', () => {
+      url = el.querySelector('#url-input')?.value.trim() || url;
+      if (url) analyzeUrl(url);
+    });
+
+    el.querySelector('#shortcut-btn')?.addEventListener('click', () => {
+      Router.navigate('shortcut-guide', {});
+    });
+
+    el.querySelector('#save-btn')?.addEventListener('click', () => {
+      if (!importedRecipe) return;
+      const recipe = {
+        ...importedRecipe,
+        tags: [...(importedRecipe.tags || []), 'noch-nicht-gekocht'],
+        cookCount: 0,
+        savedAt: new Date().toISOString(),
+      };
+      Store.saveRecipe(recipe);
+      const toast = document.createElement('div');
+      toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+      toast.textContent = `📖 "${importedRecipe.name}" gespeichert!`;
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+      navigate('cookbook');
+    });
+
+    el.querySelector('#retry-btn')?.addEventListener('click', () => { status = 'idle'; importedRecipe = null; render(); });
+  }
+
+  // Auto-start wenn URL übergeben
+  if (importUrl) analyzeUrl(importUrl);
+  else render();
+};
+
+// ============================================
+// SHORTCUT GUIDE SCREEN
+// ============================================
+Screens['shortcut-guide'] = function(el, params) {
+  const BASE_URL = 'https://erikfritsche-0394596.github.io/herbi/';
+
+  el.innerHTML = `
+    <div style="display:flex;flex-direction:column;min-height:100%">
+      <div class="status-spacer"></div>
+      <div class="page-header">
+        <div class="page-header-row">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="recipe-hero-btn left" style="position:static" id="back-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15,18 9,12 15,6"/></svg>
+            </div>
+            <h1 class="page-title">Shortcut einrichten</h1>
+          </div>
+        </div>
+      </div>
+
+      <div style="flex:1;overflow-y:auto;padding:0 16px 24px">
+
+        <div style="background:#007AFF;border-radius:var(--border-radius-lg);padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:12px">
+          <div style="font-size:36px">⚡</div>
+          <div>
+            <div style="font-size:15px;font-weight:700;color:#fff">Einmalig einrichten</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px;line-height:1.4">Danach: TikTok/Safari → Teilen → Herbi → fertig</div>
+          </div>
+        </div>
+
+        ${[
+          { num:1, icon:'📱', title:'Kurzbefehle-App öffnen', desc:'Die App ist auf jedem iPhone vorinstalliert. Falls nicht: App Store → "Kurzbefehle".' },
+          { num:2, icon:'➕', title:'Neuen Kurzbefehl erstellen', desc:'Oben rechts auf das <b>+</b> tippen → "Aktion hinzufügen".' },
+          { num:3, icon:'🔍', title:'"URL" suchen', desc:'Im Suchfeld "URL" eingeben → <b>"URL"</b> Aktion auswählen.' },
+          { num:4, icon:'📋', title:'Diese URL eintragen', desc:`Tippe auf das URL-Feld und füge folgendes ein:<br><code style="background:rgba(0,0,0,0.08);padding:3px 6px;border-radius:4px;font-size:11px;word-break:break-all">${BASE_URL}?import=[Eingabe]</code><br><br>Das <b>[Eingabe]</b> ist eine Variable – tippe erst die URL ein, dann tippe auf das blaue <b>+</b> und wähle <b>"Kurzbefehl-Eingabe"</b>.` },
+          { num:5, icon:'🌐', title:'"Im Browser öffnen" hinzufügen', desc:'Zweite Aktion: "URL öffnen" → URL aus vorherigem Schritt auswählen.' },
+          { num:6, icon:'✏️', title:'Kurzbefehl benennen', desc:'Oben auf den Namen tippen → <b>"Rezept zu Herbi"</b> eingeben.' },
+          { num:7, icon:'🎉', title:'Fertig!', desc:'Ab jetzt: In TikTok/Instagram/Safari auf <b>Teilen</b> → <b>"Rezept zu Herbi"</b> → App öffnet sich automatisch und analysiert das Rezept.' },
+        ].map(s => `
+          <div style="display:flex;gap:12px;margin-bottom:14px;align-items:flex-start">
+            <div style="width:28px;height:28px;border-radius:50%;background:#2D7D3A;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${s.num}</div>
+            <div style="flex:1;background:var(--color-background-secondary);border-radius:var(--border-radius-md);padding:11px 12px">
+              <div style="font-size:13px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">${s.icon} ${s.title}</div>
+              <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6">${s.desc}</div>
+            </div>
+          </div>
+        `).join('')}
+
+        <div style="background:#EAF3DE;border-radius:var(--border-radius-md);padding:12px 14px;margin-top:4px">
+          <div style="font-size:12px;color:#27500A;line-height:1.6">
+            <b>💡 Tipp:</b> Du kannst den Kurzbefehl auch zum Startbildschirm hinzufügen für noch schnelleren Zugriff. Oder den Shortcut aus der Kurzbefehle-Galerie suchen – suche nach "Share to URL".
+          </div>
+        </div>
+
+      </div>
+    </div>
+  `;
+
+  el.querySelector('#back-btn')?.addEventListener('click', () => goBack());
 };
