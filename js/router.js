@@ -85,7 +85,7 @@ const Router = (() => {
     if (!nav) return;
 
     // Nav nur bei Haupt-Screens anzeigen
-    const mainScreens = ['plan', 'pantry', 'settings'];
+    const mainScreens = ['plan', 'pantry', 'cookbook', 'settings'];
     nav.style.display = mainScreens.includes(screenName) ? 'flex' : 'none';
 
     // Aktiven Tab markieren
