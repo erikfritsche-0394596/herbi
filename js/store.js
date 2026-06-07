@@ -263,6 +263,62 @@ const Store = (() => {
     return state.surplusData?.[weekKey] || {};
   }
 
+
+  // ============================================
+  // REZEPTEBUCH (Cookbook) Funktionen
+  // ============================================
+
+  // Rezept zum Buch hinzufügen
+  function saveRecipe(recipe) {
+    if (!state.cookbook) state.cookbook = {};
+    const key = recipe.id || recipe.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    state.cookbook[key] = {
+      ...recipe,
+      id:        key,
+      savedAt:   new Date().toISOString(),
+      cookCount: (state.cookbook[key]?.cookCount || 0) + 1,
+      lastCooked: new Date().toISOString(),
+    };
+    save();
+    return key;
+  }
+
+  // Rezept aus Buch entfernen
+  function removeRecipe(id) {
+    if (state.cookbook?.[id]) {
+      delete state.cookbook[id];
+      save();
+    }
+  }
+
+  // Alle Rezepte laden
+  function getCookbook() {
+    return state.cookbook || {};
+  }
+
+  // Einzelnes Rezept laden
+  function getRecipe(id) {
+    return state.cookbook?.[id] || null;
+  }
+
+  // Ist Rezept im Buch?
+  function isInCookbook(nameOrId) {
+    const id = nameOrId.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    return !!(state.cookbook?.[id] || state.cookbook?.[nameOrId]);
+  }
+
+  // Rezepte für Plan-Generierung (ersetzt API-Call wenn vorhanden)
+  function getCookbookForPlanning(filters = {}) {
+    const all = Object.values(state.cookbook || {});
+    return all.filter(r => {
+      if (filters.diets?.length && !filters.diets.includes('alles')) {
+        const hasTag = filters.diets.some(d => r.tags?.includes(d));
+        if (!hasTag) return false;
+      }
+      return true;
+    }).sort((a, b) => (b.cookCount || 0) - (a.cookCount || 0));
+  }
+
   // Initialisieren
   load();
 
@@ -283,6 +339,12 @@ const Store = (() => {
     getCurrentWeekKey,
     weekKeyToDates,
     save,
+    saveRecipe,
+    removeRecipe,
+    getCookbook,
+    getRecipe,
+    isInCookbook,
+    getCookbookForPlanning,
     savePantryItem,
     savePantryItems,
     updatePantryItem,
