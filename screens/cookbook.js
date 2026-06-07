@@ -428,8 +428,12 @@ Screens['cookbook-import'] = async function(el, params) {
 
 URL: ${targetUrl}
 
-Falls es sich um eine TikTok/Instagram/YouTube URL handelt, extrahiere was du aus der URL und dem Kontext ableiten kannst.
-Falls es eine normale Website ist, extrahiere das vollständige Rezept.
+WICHTIGE REGELN:
+1. Übernimm die Zutatenmengen EXAKT so wie sie auf der Website stehen – rechne NICHTS um.
+2. Wenn auf der Seite z.B. "4 Portionen" steht, übernimm alle Mengen für 4 Portionen und trage portionen: 4 ein.
+3. Erfinde keine Mengen und teile keine Mengen durch eine andere Zahl.
+4. Wenn du eine Website analysierst, lies den tatsächlichen Seiteninhalt.
+5. Bei TikTok/Instagram/YouTube-Links: antworte mit {"error": "TikTok/Instagram/YouTube-Videos können leider nicht ausgelesen werden. Bitte nutze direkte Rezept-Websites wie Chefkoch, AllRecipes, etc."}
 
 Antworte NUR mit einem JSON-Objekt (kein Markdown):
 {
@@ -438,6 +442,7 @@ Antworte NUR mit einem JSON-Objekt (kein Markdown):
   "source_url": "${targetUrl}",
   "source_type": "website|tiktok|instagram|youtube|other",
   "time_min": 30,
+  "portions": 4,
   "tags": ["vegetarisch", "italienisch"],
   "ingredients": [
     {"name": "Zutat", "amount": 200, "unit": "g"}
@@ -582,8 +587,12 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
               ${(importedRecipe.tags||[]).map(t=>`<span class="tag tag-gray" style="font-size:10px">${t}</span>`).join('')}
               <span class="tag" style="font-size:10px;background:#FAEEDA;color:#633806;font-weight:600">Noch nicht gekocht</span>
             </div>
+            ${importedRecipe.portions ? `
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">
+              <span style="background:#EAF3DE;color:#27500A;padding:2px 8px;border-radius:6px;font-weight:500">Für ${importedRecipe.portions} Portionen</span>
+            </div>` : ''}
             ${importedRecipe.ingredients?.length ? `
-            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:6px">${importedRecipe.ingredients.length} Zutaten gefunden</div>` : ''}
+            <div style="font-size:12px;color:var(--color-text-secondary);margin-bottom:4px">${importedRecipe.ingredients.length} Zutaten gefunden</div>` : ''}
             ${importedRecipe.steps?.length ? `
             <div style="font-size:12px;color:var(--color-text-secondary)">${importedRecipe.steps.length} Schritte gefunden</div>` : ''}
           </div>
