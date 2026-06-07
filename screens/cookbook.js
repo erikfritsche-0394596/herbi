@@ -196,10 +196,10 @@ Screens['cookbook-recipe'] = function(el, params) {
   const { recipe } = params;
   if (!recipe) { goBack(); return; }
 
-  let portions    = Store.getSettings().portions || 1;
+  let portions    = recipe.portions || Store.getSettings().portions || 1;
   let checkedIngs = new Set();
   let doneSteps   = new Set();
-  const BASE_P    = portions;
+  const BASE_P    = portions; // Basis = gespeicherte Portionen des Rezepts
 
   const TAG_LABELS = {
     'meal-prep':'Meal Prep','vegetarisch':'Veggie','vegan':'Vegan',
@@ -414,8 +414,115 @@ Screens['cookbook-import'] = async function(el, params) {
   let status     = importUrl ? 'loading' : 'idle';
   let errorMsg   = '';
   let importedRecipe = null;
-  let mode       = 'url'; // 'url' | 'text'
+  let mode       = 'url'; // 'url' | 'text' | 'blog'
   let textInput  = '';
+  let blogUrl    = '';
+  let blogRecipes = []; // gefundene Rezepte auf dem Blog
+  let blogStatus = 'idle'; // idle | loading | results | error
+  let selectedBlogRecipes = new Set();
+
+  async function discoverBlogRecipes(domain) {
+    blogStatus = 'loading';
+    blogRecipes = [];
+    selectedBlogRecipes = new Set();
+    errorMsg = '';
+    render();
+
+    try {
+      const apiKey = localStorage.getItem('herbi_api_key');
+      if (!apiKey) throw new Error('Kein API Key gespeichert.');
+
+      // URL normalisieren
+      let cleanUrl = domain.trim();
+      if (!cleanUrl.startsWith('http')) cleanUrl = 'https://' + cleanUrl;
+
+      const prompt = `Suche auf der Website "${cleanUrl}" nach Rezepten.
+
+Analysiere die Website und erstelle eine Liste von Rezepten die dort zu finden sind.
+Falls du die Website kennst, liste bekannte Rezepte auf.
+Falls nicht, liste typische Rezepte die auf einer solchen Website zu finden wären.
+
+Antworte NUR mit einem JSON-Array (kein Markdown, max. 15 Rezepte):
+[
+  {
+    "name": "Rezeptname",
+    "emoji": "🍝",
+    "url": "https://vollständige-url-zum-rezept",
+    "time_min": 30,
+    "tags": ["vegetarisch"]
+  }
+]
+
+Falls die Website keine Rezepte hat oder nicht existiert:
+{"error": "Kurze Erklärung"}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const rawJson = data.content[0].text.trim();
+      const text = rawJson.replace(/```json[\s\S]*?```/g, m => m.slice(7,-3)).replace(/^```|```$/gm,'').trim();
+      const result = JSON.parse(text);
+
+      if (result.error) throw new Error(result.error);
+      if (!Array.isArray(result)) throw new Error('Keine Rezepte gefunden.');
+
+      blogRecipes = result;
+      blogStatus = 'results';
+
+    } catch(err) {
+      console.error('Blog discovery error:', err);
+      errorMsg = err.message;
+      blogStatus = 'error';
+    }
+    render();
+  }
+
+  async function importSelectedBlogRecipes() {
+    const toImport = [...selectedBlogRecipes].map(i => blogRecipes[i]);
+    let imported = 0;
+
+    for (const recipe of toImport) {
+      try {
+        // Vollständiges Rezept laden wenn URL vorhanden
+        if (recipe.url) {
+          await analyzeUrl(recipe.url);
+          if (importedRecipe) {
+            Store.saveRecipe({
+              ...importedRecipe,
+              tags: [...(importedRecipe.tags || []), 'noch-nicht-gekocht'],
+              cookCount: 0,
+              savedAt: new Date().toISOString(),
+              portions: importedRecipe.portions || 1,
+            });
+            importedRecipe = null;
+            imported++;
+          }
+        }
+      } catch(e) {
+        console.error('Import error for', recipe.name, e);
+      }
+    }
+
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+    toast.textContent = `📖 ${imported} Rezept${imported!==1?'e':''} gespeichert!`;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 3000);
+    navigate('cookbook');
+  }
 
   async function analyzeText(text) {
     status = 'loading';
@@ -593,7 +700,10 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
               🔗 Website-Link
             </button>
             <button data-mode="text" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:${mode==='text'?'var(--color-background-primary)':'transparent'};color:${mode==='text'?'var(--color-text-primary)':'var(--color-text-secondary)'};transition:all 0.15s">
-              📋 Text einfügen
+              📋 Text
+            </button>
+            <button data-mode="blog" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:${mode==='blog'?'var(--color-background-primary)':'transparent'};color:${mode==='blog'?'var(--color-text-primary)':'var(--color-text-secondary)'};transition:all 0.15s">
+              🔍 Blog
             </button>
           </div>
 
@@ -642,6 +752,56 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
             Rezept extrahieren ✨
           </button>
           `}
+
+          ${mode === 'blog' ? `
+          <!-- Blog Discovery Modus -->
+          <div style="margin-bottom:12px;padding:10px 12px;background:#EAF3DE;border-radius:10px;font-size:12px;color:#27500A;line-height:1.6">
+            Gib eine Website oder Blog-URL ein – nur den Domainnamen reicht. Claude sucht alle Rezepte die dort zu finden sind.
+          </div>
+
+          <div style="position:relative;margin-bottom:10px">
+            <input
+              id="blog-input"
+              type="text"
+              placeholder="z.B. chefkoch.de oder butterhand.com"
+              value="${blogUrl}"
+              style="width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--color-border-secondary);background:var(--color-background-secondary);font-size:14px;color:var(--color-text-primary);outline:none;-webkit-appearance:none"
+            >
+          </div>
+
+          <button id="discover-btn" style="width:100%;padding:14px;border-radius:14px;background:${blogUrl.trim()?'#2D7D3A':'#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:14px" ${!blogUrl.trim()?'disabled':''}>
+            ${blogStatus==='loading' ? 'Rezepte werden gesucht…' : 'Rezepte suchen 🔍'}
+          </button>
+
+          ${blogStatus === 'loading' ? `
+          <div style="display:flex;align-items:center;gap:10px;padding:14px;background:var(--color-background-secondary);border-radius:12px">
+            <div class="spinner" style="width:18px;height:18px;border-width:2px;flex-shrink:0"></div>
+            <span style="font-size:13px;color:var(--color-text-secondary)">Claude durchsucht die Website…</span>
+          </div>
+          ` : blogStatus === 'error' ? `
+          <div style="padding:10px 12px;background:#FAECE7;border-radius:10px;font-size:12px;color:#712B13">${errorMsg}</div>
+          ` : blogStatus === 'results' && blogRecipes.length > 0 ? `
+          <div style="font-size:12px;font-weight:500;color:var(--color-text-secondary);margin-bottom:8px">${blogRecipes.length} Rezepte gefunden – wähle die die du möchtest:</div>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+            ${blogRecipes.map((r,i) => `
+            <div data-blog-recipe="${i}" style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;border:1.5px solid ${selectedBlogRecipes.has(i)?'#2D7D3A':'var(--color-border-secondary)'};background:${selectedBlogRecipes.has(i)?'#EAF3DE':'var(--color-background-primary)'};cursor:pointer;transition:all 0.12s">
+              <div style="width:20px;height:20px;border-radius:50%;border:1.5px solid ${selectedBlogRecipes.has(i)?'#2D7D3A':'var(--color-border-secondary)'};background:${selectedBlogRecipes.has(i)?'#2D7D3A':'transparent'};display:flex;align-items:center;justify-content:center;flex-shrink:0">
+                ${selectedBlogRecipes.has(i)?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3"><polyline points="20,6 9,17 4,12"/></svg>':''}
+              </div>
+              <div style="flex:1">
+                <div style="font-size:13px;font-weight:500;color:${selectedBlogRecipes.has(i)?'#27500A':'var(--color-text-primary)'}">${r.emoji||'🍽️'} ${r.name}</div>
+                ${r.time_min?`<div style="font-size:11px;color:var(--color-text-tertiary);margin-top:2px">${r.time_min} min</div>`:''}
+              </div>
+            </div>
+            `).join('')}
+          </div>
+          ${selectedBlogRecipes.size > 0 ? `
+          <button id="import-selected-btn" style="width:100%;padding:14px;border-radius:14px;background:#2D7D3A;color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer">
+            ${selectedBlogRecipes.size} Rezept${selectedBlogRecipes.size!==1?'e':''} importieren →
+          </button>` : ''}
+          ` : ''}
+
+          ` : ''}
 
           ` : status === 'loading' ? `
           <!-- Loading -->
@@ -730,6 +890,31 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
       if (textInput.trim()) analyzeText(textInput.trim());
     });
 
+    // Blog mode events
+    el.querySelector('#blog-input')?.addEventListener('input', e => {
+      blogUrl = e.target.value;
+      const btn = el.querySelector('#discover-btn');
+      if (btn) { btn.disabled = !blogUrl.trim(); btn.style.background = blogUrl.trim() ? '#2D7D3A' : '#9a9a94'; }
+    });
+
+    el.querySelector('#discover-btn')?.addEventListener('click', () => {
+      blogUrl = el.querySelector('#blog-input')?.value.trim() || blogUrl;
+      if (blogUrl) discoverBlogRecipes(blogUrl);
+    });
+
+    el.querySelectorAll('[data-blog-recipe]').forEach(card => {
+      card.addEventListener('click', () => {
+        const i = parseInt(card.dataset.blogRecipe);
+        if (selectedBlogRecipes.has(i)) selectedBlogRecipes.delete(i);
+        else selectedBlogRecipes.add(i);
+        render();
+      });
+    });
+
+    el.querySelector('#import-selected-btn')?.addEventListener('click', () => {
+      importSelectedBlogRecipes();
+    });
+
     el.querySelector('#shortcut-btn')?.addEventListener('click', () => {
       Router.navigate('shortcut-guide', {});
     });
@@ -741,6 +926,7 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
         tags: [...(importedRecipe.tags || []), 'noch-nicht-gekocht'],
         cookCount: 0,
         savedAt: new Date().toISOString(),
+        portions: importedRecipe.portions || 1,
       };
       Store.saveRecipe(recipe);
       const toast = document.createElement('div');
