@@ -411,9 +411,82 @@ Screens['cookbook-import'] = async function(el, params) {
   const { importUrl } = params || {};
 
   let url        = importUrl || '';
-  let status     = importUrl ? 'loading' : 'idle'; // idle | loading | success | error
+  let status     = importUrl ? 'loading' : 'idle';
   let errorMsg   = '';
   let importedRecipe = null;
+  let mode       = 'url'; // 'url' | 'text'
+  let textInput  = '';
+
+  async function analyzeText(text) {
+    status = 'loading';
+    errorMsg = '';
+    render();
+
+    try {
+      const apiKey = localStorage.getItem('herbi_api_key');
+      if (!apiKey) throw new Error('Kein API Key gespeichert.');
+
+      const prompt = `Extrahiere aus folgendem Text ein strukturiertes Rezept.
+
+TEXT:
+${text}
+
+WICHTIGE REGELN:
+1. Übernimm die Zutatenmengen EXAKT so wie sie im Text stehen – rechne NICHTS um.
+2. Erfinde keine Zutaten die nicht im Text stehen.
+3. Wenn Portionen erwähnt werden, trage sie unter "portions" ein.
+
+Antworte NUR mit einem JSON-Objekt (kein Markdown):
+{
+  "name": "Rezeptname (aus dem Text ableiten)",
+  "emoji": "🍝",
+  "source_type": "text",
+  "time_min": 30,
+  "portions": 4,
+  "tags": ["vegetarisch"],
+  "ingredients": [
+    {"name": "Zutat", "amount": 200, "unit": "g"}
+  ],
+  "steps": [
+    {"text": "Schritt 1...", "timer_min": null}
+  ]
+}
+
+Falls der Text kein Rezept enthält:
+{"error": "Kein Rezept gefunden"}`;
+
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
+        },
+        body: JSON.stringify({
+          model: 'claude-opus-4-5',
+          max_tokens: 2000,
+          messages: [{ role: 'user', content: prompt }],
+        }),
+      });
+
+      const data = await response.json();
+      const rawText = data.content[0].text.trim()
+        .replace(/```json\n?/g,'').replace(/```\n?/g,'').trim();
+      const result = JSON.parse(rawText);
+
+      if (result.error) throw new Error(result.error);
+
+      importedRecipe = result;
+      status = 'success';
+
+    } catch(err) {
+      console.error('Text import error:', err);
+      errorMsg = err.message;
+      status = 'error';
+    }
+    render();
+  }
 
   async function analyzeUrl(targetUrl) {
     status = 'loading';
@@ -513,50 +586,62 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
         <div style="flex:1;padding:0 16px 16px;overflow-y:auto">
 
           ${status === 'idle' || status === 'error' ? `
-          <!-- URL Eingabe -->
+
+          <!-- Mode Tabs -->
+          <div style="display:flex;gap:6px;margin-bottom:16px;background:var(--color-background-secondary);padding:4px;border-radius:12px">
+            <button data-mode="url" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:${mode==='url'?'var(--color-background-primary)':'transparent'};color:${mode==='url'?'var(--color-text-primary)':'var(--color-text-secondary)'};transition:all 0.15s">
+              🔗 Website-Link
+            </button>
+            <button data-mode="text" style="flex:1;padding:9px;border-radius:9px;font-size:13px;font-weight:500;border:none;cursor:pointer;background:${mode==='text'?'var(--color-background-primary)':'transparent'};color:${mode==='text'?'var(--color-text-primary)':'var(--color-text-secondary)'};transition:all 0.15s">
+              📋 Text einfügen
+            </button>
+          </div>
+
+          ${mode === 'url' ? `
+          <!-- URL Modus -->
           <div style="margin-bottom:16px">
-            <div style="font-size:13px;font-weight:500;color:var(--color-text-primary);margin-bottom:8px">Rezept-URL einfügen</div>
             <div style="position:relative">
               <input
                 id="url-input"
                 type="url"
-                placeholder="https://... oder TikTok/Instagram Link"
+                placeholder="https://chefkoch.de/rezepte/..."
                 value="${url}"
                 style="width:100%;padding:13px 44px 13px 14px;border-radius:12px;border:1.5px solid ${status==='error'?'#E24B4A':'var(--color-border-secondary)'};background:var(--color-background-secondary);font-size:14px;color:var(--color-text-primary);outline:none;-webkit-appearance:none"
               >
-              ${url ? `
-              <div id="clear-btn" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--color-text-tertiary);font-size:18px;line-height:1">×</div>
-              ` : ''}
+              ${url ? `<div id="clear-btn" style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--color-text-tertiary);font-size:18px;line-height:1">×</div>` : ''}
             </div>
-            ${status === 'error' ? `
-            <div style="margin-top:8px;padding:10px 12px;background:#FAECE7;border-radius:10px;font-size:12px;color:#712B13">
-              ${errorMsg}
-            </div>` : ''}
+            ${status === 'error' ? `<div style="margin-top:8px;padding:10px 12px;background:#FAECE7;border-radius:10px;font-size:12px;color:#712B13">${errorMsg}</div>` : ''}
           </div>
-
-          <button id="analyze-btn" style="width:100%;padding:14px;border-radius:14px;background:${url?'#2D7D3A':'#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:20px" ${!url?'disabled':''}>
+          <button id="analyze-btn" style="width:100%;padding:14px;border-radius:14px;background:${url?'#2D7D3A':'#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:16px" ${!url?'disabled':''}>
             Rezept analysieren ✨
           </button>
-
-          <!-- Shortcut Anleitung -->
-          <div style="background:var(--color-background-secondary);border-radius:var(--border-radius-lg);padding:16px;margin-bottom:12px">
-            <div style="font-size:14px;font-weight:600;color:var(--color-text-primary);margin-bottom:4px">⚡ Tipp: Apple Shortcut einrichten</div>
-            <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:12px">
-              Einmalig einrichten → danach kannst du in TikTok, Instagram, Safari auf <b>Teilen</b> tippen und direkt zu Herbi schicken.
-            </div>
-            <button id="shortcut-btn" style="width:100%;padding:11px;border-radius:11px;background:#007AFF;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-              Shortcut-Anleitung anzeigen
-            </button>
+          <div style="padding:10px 12px;background:var(--color-background-secondary);border-radius:10px;font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin-bottom:16px">
+            ✅ Funktioniert mit: Chefkoch, Kitchenstories, AllRecipes, BBC Good Food, Essen&Trinken und allen normalen Rezept-Websites<br>
+            ❌ Nicht möglich: TikTok, Instagram, YouTube → nutze dafür den <b>Text einfügen</b> Modus
           </div>
-
-          <!-- Unterstützte Quellen -->
-          <div style="font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--color-text-tertiary);margin-bottom:8px">Unterstützte Quellen</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px">
-            ${['🎵 TikTok','📸 Instagram','🌐 Websites','▶️ YouTube','📰 Blogs'].map(s=>`
-              <span style="font-size:12px;padding:4px 10px;border-radius:20px;background:var(--color-background-secondary);color:var(--color-text-secondary);border:0.5px solid var(--color-border-secondary)">${s}</span>
-            `).join('')}
+          <button id="shortcut-btn" style="width:100%;padding:11px;border-radius:11px;background:#007AFF;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Shortcut-Anleitung
+          </button>
+          ` : `
+          <!-- Text Modus -->
+          <div style="margin-bottom:12px;padding:10px 12px;background:#E6F1FB;border-radius:10px;font-size:12px;color:#0C447C;line-height:1.6">
+            <b>So geht's für TikTok/Instagram:</b><br>
+            1. TikTok/Insta öffnen → Video antippen<br>
+            2. Beschreibung des Videos kopieren (Zutaten stehen oft dort)<br>
+            3. Oder: Kommentare lesen, Creator schreiben Rezept oft rein<br>
+            4. Den Text hier einfügen
           </div>
+          <textarea
+            id="text-input"
+            placeholder="Rezepttext hier einfügen…&#10;&#10;Zum Beispiel:&#10;500g Hähnchenbrust&#10;2 Knoblauchzehen&#10;1 TL Paprika&#10;..."
+            style="width:100%;height:180px;padding:13px 14px;border-radius:12px;border:1.5px solid ${status==='error'?'#E24B4A':'var(--color-border-secondary)'};background:var(--color-background-secondary);font-size:14px;color:var(--color-text-primary);outline:none;-webkit-appearance:none;resize:none;line-height:1.6;font-family:-apple-system,sans-serif"
+          >${textInput}</textarea>
+          ${status === 'error' ? `<div style="margin-top:8px;padding:10px 12px;background:#FAECE7;border-radius:10px;font-size:12px;color:#712B13">${errorMsg}</div>` : ''}
+          <button id="analyze-text-btn" style="width:100%;padding:14px;border-radius:14px;background:${textInput.trim()?'#2D7D3A':'#9a9a94'};color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-top:10px" ${!textInput.trim()?'disabled':''}>
+            Rezept extrahieren ✨
+          </button>
+          `}
 
           ` : status === 'loading' ? `
           <!-- Loading -->
@@ -620,9 +705,29 @@ Falls du kein Rezept extrahieren kannst, antworte mit:
 
     el.querySelector('#clear-btn')?.addEventListener('click', () => { url = ''; status = 'idle'; render(); });
 
+    el.querySelectorAll('[data-mode]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        mode = btn.dataset.mode;
+        status = 'idle';
+        errorMsg = '';
+        render();
+      });
+    });
+
     el.querySelector('#analyze-btn')?.addEventListener('click', () => {
       url = el.querySelector('#url-input')?.value.trim() || url;
       if (url) analyzeUrl(url);
+    });
+
+    el.querySelector('#text-input')?.addEventListener('input', e => {
+      textInput = e.target.value;
+      const btn = el.querySelector('#analyze-text-btn');
+      if (btn) { btn.disabled = !textInput.trim(); btn.style.background = textInput.trim() ? '#2D7D3A' : '#9a9a94'; }
+    });
+
+    el.querySelector('#analyze-text-btn')?.addEventListener('click', () => {
+      textInput = el.querySelector('#text-input')?.value || textInput;
+      if (textInput.trim()) analyzeText(textInput.trim());
     });
 
     el.querySelector('#shortcut-btn')?.addEventListener('click', () => {
