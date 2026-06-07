@@ -45,6 +45,9 @@ Screens.recipe = function(el, params) {
           <div class="recipe-hero-btn right" id="swap-btn" title="Rezept tauschen">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17,1 21,5 17,9"/><path d="M3,11V9a4,4,0,0,1,4-4h14"/><polyline points="7,23 3,19 7,15"/><path d="M21,13v2a4,4,0,0,1-4,4H3"/></svg>
           </div>
+          <div class="recipe-hero-btn" id="save-btn" title="Ins Rezeptebuch" style="top:12px;left:50%;transform:translateX(-50%)">
+            <svg id="save-icon" width="15" height="15" viewBox="0 0 24 24" fill="${Store.isInCookbook(meal.name) ? '#2D7D3A' : 'none'}" stroke="${Store.isInCookbook(meal.name) ? '#2D7D3A' : 'currentColor'}" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          </div>
         </div>
 
         <!-- Body -->
@@ -161,6 +164,20 @@ Screens.recipe = function(el, params) {
       Router.navigate('swap', { weekKey, day, type, meal });
     });
 
+    // Ins Rezeptebuch speichern
+    el.querySelector('#save-btn')?.addEventListener('click', () => {
+      const inBook = Store.isInCookbook(meal.name);
+      if (inBook) {
+        const id = meal.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+        Store.removeRecipe(id);
+        showToastMsg('Aus Rezeptebuch entfernt');
+      } else {
+        Store.saveRecipe({ ...meal, ingredients: (meal.ingredients || []) });
+        showToastMsg('✓ Ins Rezeptebuch gespeichert!');
+      }
+      render(); // Icon aktualisieren
+    });
+
     // Ingredient checkboxes
     el.querySelectorAll('[data-ing]').forEach(row => {
       row.addEventListener('click', () => {
@@ -198,14 +215,53 @@ Screens.recipe = function(el, params) {
     el.querySelector('#cooked-btn').addEventListener('click', () => {
       Store.markCooked(weekKey, day, type, !meal.cooked);
       meal.cooked = !meal.cooked;
+
+      // Wenn zum ersten Mal gekocht → fragen ob ins Rezeptebuch
+      if (meal.cooked && !Store.isInCookbook(meal.name)) {
+        showCookedDialog(meal);
+      } else {
+        showToastMsg(meal.cooked ? '✓ Als gekocht markiert' : 'Markierung entfernt');
+      }
       render();
-      // Kurz Toast zeigen
-      const toast = document.createElement('div');
-      toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap';
-      toast.textContent = meal.cooked ? '✓ Als gekocht markiert' : 'Markierung entfernt';
-      document.body.appendChild(toast);
-      setTimeout(() => toast.remove(), 2000);
     });
+  }
+
+  function showToastMsg(msg) {
+    const toast = document.createElement('div');
+    toast.style.cssText = 'position:fixed;bottom:90px;left:50%;transform:translateX(-50%);background:#2D7D3A;color:#fff;padding:10px 18px;border-radius:20px;font-size:13px;font-weight:600;z-index:999;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+    toast.textContent = msg;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 2500);
+  }
+
+  function showCookedDialog(meal) {
+    const overlay = document.createElement('div');
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0)';
+    overlay.innerHTML = `
+      <div style="background:#fff;border-radius:24px 24px 0 0;padding:24px 20px 32px;width:100%;max-width:430px">
+        <div style="font-size:32px;text-align:center;margin-bottom:10px">${meal.emoji || '🍽️'}</div>
+        <div style="font-size:17px;font-weight:700;color:#1a1a18;text-align:center;margin-bottom:6px">Hat's geschmeckt?</div>
+        <div style="font-size:13px;color:#5a5a56;text-align:center;margin-bottom:20px;line-height:1.5">${meal.name}</div>
+        <button id="save-yes" style="width:100%;padding:14px;border-radius:14px;background:#2D7D3A;color:#fff;font-size:15px;font-weight:700;border:none;cursor:pointer;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:8px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+          Ja – ins Rezeptebuch speichern
+        </button>
+        <button id="save-no" style="width:100%;padding:14px;border-radius:14px;background:#f5f5f0;color:#5a5a56;font-size:15px;font-weight:600;border:none;cursor:pointer">
+          Nein danke
+        </button>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector('#save-yes').addEventListener('click', () => {
+      Store.saveRecipe({ ...meal });
+      overlay.remove();
+      showToastMsg('📖 Ins Rezeptebuch gespeichert!');
+    });
+    overlay.querySelector('#save-no').addEventListener('click', () => {
+      overlay.remove();
+      showToastMsg('✓ Als gekocht markiert');
+    });
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
   }
 
   render();
